@@ -120,16 +120,16 @@ class BaseTrainer:
         )
 
         return loss
-
+    
     def d_backward(self):
         with utils.temporary_freeze(self.gen):
             d_loss = sum(self.d_losses.values())
             d_loss.backward()
 
     def g_backward(self):
-        with utils.temporary_freeze(self.disc):
-            g_loss = sum(self.g_losses.values())
-            g_loss.backward()
+        #with utils.temporary_freeze(self.disc):
+        g_loss = sum(self.g_losses.values())
+        g_loss.backward()
 
     def ac_backward(self):
         if self.aux_clf is None:

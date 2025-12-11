@@ -52,7 +52,7 @@ def setup_transforms(cfg):
         aug_transform = [
             transforms.ToPILImage(),
             transforms.RandomAffine(
-                degrees=10, translate=(0.03, 0.03), scale=(0.9, 1.1), shear=10, fillcolor=255
+                degrees=10, translate=(0.03, 0.03), scale=(0.9, 1.1), shear=10, fillcolor=(255, 255, 255)
             )
         ]
     else:
@@ -60,7 +60,8 @@ def setup_transforms(cfg):
 
     tensorize_transform = [transforms.Resize((128, 128)), transforms.ToTensor()]
     if cfg.dset_aug.normalize:
-        tensorize_transform.append(transforms.Normalize([0.5], [0.5]))
+        tensorize_transform.append(transforms.Normalize([0.5, 0.5, 0.5],
+                                                        [0.5, 0.5, 0.5])) # [R, G, B]
         cfg.g_args.dec.out = "tanh"
 
     trn_transform = transforms.Compose(aug_transform + tensorize_transform)
@@ -137,12 +138,7 @@ def train(args, cfg, ddp_gpu=-1):
     gen = Generator(3, cfg.C, 1, **g_kwargs) # RGB input channel 1->3
     gen.cuda()
     gen.apply(weights_init(cfg.init))
-    '''
-    d_kwargs = cfg.get("d_args", {})
-    disc = disc_builder(cfg.C, trn_dset.n_fonts, trn_dset.n_chars, **d_kwargs)
-    disc.cuda()
-    disc.apply(weights_init(cfg.init))
-    '''
+
     aux_clf = aux_clf_builder(gen.feat_shape["last"], trn_dset.n_fonts, n_comps, **cfg.ac_args)
     aux_clf.cuda()
     aux_clf.apply(weights_init(cfg.init))
@@ -150,17 +146,16 @@ def train(args, cfg, ddp_gpu=-1):
     g_optim = optim.Adam(gen.parameters(),
                          lr=cfg.g_lr,
                          betas=cfg.adam_betas)
-    #d_optim = optim.Adam(disc.parameters(), lr=cfg.d_lr, betas=cfg.adam_betas)
     ac_optim = optim.Adam(aux_clf.parameters(), lr=cfg.ac_lr, betas=cfg.adam_betas)
 
     st_step = 0
     if cfg.resume:
-        st_step, loss = load_checkpoint(cfg.resume, gen, disc, aux_clf, g_optim, d_optim, ac_optim, cfg.force_resume)
+        st_step, loss = load_checkpoint(cfg.resume, gen, None, aux_clf, g_optim, None, ac_optim, cfg.force_resume)
         logger.info("Resumed checkpoint from {} (Step {}, Loss {:7.3f})".format(cfg.resume, st_step, loss))
 
     evaluator = Evaluator(writer)
 
-    trainer = FactTrainer(gen, disc, g_optim, d_optim,
+    trainer = FactTrainer(gen, None, g_optim, None,
                           aux_clf, ac_optim,
                           writer, logger,
                           evaluator, test_loader,

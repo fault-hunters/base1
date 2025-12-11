@@ -102,41 +102,48 @@ class FactTrainer(BaseTrainer):
                 "B": B,
             })
 
-            real_font, real_uni, *real_feats = self.disc(
-                trg_imgs, trg_fids, trg_cids, out_feats=self.cfg['fm_layers']
-            )
+            # -------------------------
+            # GAN / Discriminator block
+            # -------------------------
+            if self.disc is not None or self.d_optim is not None:
+                real_font, real_uni, *real_feats = self.disc(
+                    trg_imgs, trg_fids, trg_cids, out_feats=self.cfg['fm_layers']
+                )
 
-            fake_font, fake_uni = self.disc(gen_imgs.detach(), trg_fids, trg_cids)
-            self.add_gan_d_loss([real_font, real_uni], [fake_font, fake_uni])
+                fake_font, fake_uni = self.disc(gen_imgs.detach(), trg_fids, trg_cids)
+                self.add_gan_d_loss([real_font, real_uni], [fake_font, fake_uni])
 
-            self.d_optim.zero_grad()
-            self.d_backward()
-            self.d_optim.step()
+                self.d_optim.zero_grad()
+                self.d_backward()
+                self.d_optim.step()
 
-            fake_font, fake_uni, *fake_feats = self.disc(
-                gen_imgs, trg_fids, trg_cids, out_feats=self.cfg['fm_layers']
-            )
-            self.add_gan_g_loss(fake_font, fake_uni)
+                fake_font, fake_uni, *fake_feats = self.disc(
+                    gen_imgs, trg_fids, trg_cids, out_feats=self.cfg['fm_layers']
+                )
+                self.add_gan_g_loss(fake_font, fake_uni)
 
-            self.add_fm_loss(real_feats, fake_feats)
+                self.add_fm_loss(real_feats, fake_feats)
 
-            def racc(x):
-                return (x > 0.).float().mean().item()
+                def racc(x):
+                    return (x > 0.).float().mean().item()
 
-            def facc(x):
-                return (x < 0.).float().mean().item()
+                def facc(x):
+                    return (x < 0.).float().mean().item()
 
-            discs.updates({
-                "real_font": real_font.mean().item(),
-                "real_uni": real_uni.mean().item(),
-                "fake_font": fake_font.mean().item(),
-                "fake_uni": fake_uni.mean().item(),
+                discs.updates({
+                    "real_font": real_font.mean().item(),
+                    "real_uni": real_uni.mean().item(),
+                    "fake_font": fake_font.mean().item(),
+                    "fake_uni": fake_uni.mean().item(),
 
-                'real_font_acc': racc(real_font),
-                'real_uni_acc': racc(real_uni),
-                'fake_font_acc': facc(fake_font),
-                'fake_uni_acc': facc(fake_uni)
-            }, B)
+                    'real_font_acc': racc(real_font),
+                    'real_uni_acc': racc(real_uni),
+                    'fake_font_acc': facc(fake_font),
+                    'fake_uni_acc': facc(fake_uni)
+                }, B)
+            # -------------------------
+            # 여기까지 GAN / disc 관련
+            # -------------------------
 
             self.add_pixel_loss(gen_imgs, trg_imgs)
 
