@@ -6,11 +6,27 @@ MIT license
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from .style_encoder import style_enc_builder
 from .experts import exp_builder
 from .decoder import dec_builder
 
 import utils
+
+
+class FuseLastSkip(nn.Module):
+    def __init__(self, C_last, C_skip, C_out):
+        super().__init__()
+        self.proj = nn.Conv2d(C_last + C_skip, C_out, 1, 1, 0)
+
+    def forward(self, last, skip):
+        # last: [B, C_l, H_l, W_l]
+        # skip: [B, C_s, H_s, W_s]
+        if skip.shape[2:] != last.shape[2:]:
+            skip = F.adaptive_avg_pool2d(skip, last.shape[2:])  # skip 해상도를 last에 맞춤
+        x = torch.cat([last, skip], dim=1)  # [B, C_l+C_s, H_l, W_l]
+        x = self.proj(x)                    # [B, C_out, H_l, W_l]
+        return x
 
 
 class Generator(nn.Module):
@@ -25,6 +41,11 @@ class Generator(nn.Module):
 
         self.fact_blocks = {}
         self.recon_blocks = {}
+
+        self.C_l = self.feat_shape["last"][0]
+        self.C_s = self.feat_shape["skip"][0]
+        self.fuser_style = FuseLastSkip(self.C_l, self.C_s, C_out=self.C_l)
+        self.fuser_content  = FuseLastSkip(self.C_l, self.C_s, C_out=self.C_l)
 
         self.emb_num = emb_num
         for _key in self.feat_shape:
@@ -62,7 +83,7 @@ class Generator(nn.Module):
             factors[_key] = _fact
 
         return factors
-
+    
     def defactorize(self, fact_list):
         feats = {}
         for _key in self.fact_blocks:
@@ -74,20 +95,62 @@ class Generator(nn.Module):
             feats[_key] = _feat
 
         return feats
+    # feature map -> vector
+    def feat_to_vec(self,feat: torch.Tensor) -> torch.Tensor:
+        """
+        feat: [B, C, H, W] 또는 [C, H, W]
+        return: [C] (한 이미지의 style/content vector)
+        """
+        if feat.dim() == 3:        # [C,H,W] 들어오면
+            feat = feat.unsqueeze(0)  # [1,C,H,W]
 
+        # 보통 B=1 전제
+        v = feat.mean(dim=[2, 3])[0]   # [C]
+        v = F.normalize(v, dim=-1)     # 코사인용 L2 정규화
+        return v
+    # vector cosine similarity
+    def cosine_sim_01(self,v1: torch.Tensor, v2: torch.Tensor) -> float:
+        """
+        v1, v2: [C]
+        return: 0~1 범위 유사도
+        """
+        sim = (v1 * v2).sum()      # [-1, 1]
+        sim01 = (sim + 1) / 2      # [0, 1]
+        return sim01.item()
+    '''
     def decode(self, feats):
         out = self.decoder(**feats)
         return out
+    '''
+    def gen_from_style_char(self, img1, img2):
+        B1 = len(img1)
+        style_enc_res1 = self.encode(img1)
+        style_facts1 = self.factorize(style_enc_res1, 0)
+        char_facts1 = self.factorize(style_enc_res1, 1)
+        m_style_facts1 = {_k: utils.add_dim_and_reshape(_v, 0, (B1, -1)).mean(1) for _k, _v in style_facts1.items()}
+        m_char_facts1 = {_k: utils.add_dim_and_reshape(_v, 0, (B1, -1)).mean(1) for _k, _v in char_facts1.items()}
 
-    def gen_from_style_char(self, style_imgs, char_imgs):
-        B = len(style_imgs)
-        style_facts = self.factorize(self.encode(style_imgs.flatten(0, 1)), 0)
-        char_facts = self.factorize(self.encode(char_imgs.flatten(0, 1)), 1)
+        B2 = len(img2)
+        style_enc_res2 = self.encode(img2)
+        style_facts2 = self.factorize(style_enc_res2, 0)
+        char_facts2 = self.factorize(style_enc_res2, 1)
+        m_style_facts2 = {_k: utils.add_dim_and_reshape(_v, 0, (B2, -1)).mean(1) for _k, _v in style_facts2.items()}
+        m_char_facts2 = {_k: utils.add_dim_and_reshape(_v, 0, (B2, -1)).mean(1) for _k, _v in char_facts2.items()}
 
-        m_style_facts = {_k: utils.add_dim_and_reshape(_v, 0, (B, -1)).mean(1) for _k, _v in style_facts.items()}
-        m_char_facts = {_k: utils.add_dim_and_reshape(_v, 0, (B, -1)).mean(1) for _k, _v in char_facts.items()}
+        # skip + last
+        style_feat1   = self.fuser_style(m_style_facts1["last"],   m_style_facts1["skip"])
+        style_feat2   = self.fuser_style(m_style_facts2["last"],   m_style_facts2["skip"])
 
-        gen_feats = self.defactorize([m_style_facts, m_char_facts])
-        gen_imgs = self.decode(gen_feats)
+        content_feat1 = self.fuser_content(m_char_facts1["last"],  m_char_facts1["skip"])
+        content_feat2 = self.fuser_content(m_char_facts2["last"],  m_char_facts2["skip"])
 
-        return gen_imgs
+        # 유사도 계산
+        style_feat1 = self.feat_to_vec(style_feat1)
+        style_feat2 = self.feat_to_vec(style_feat2)
+        content_feat1 = self.feat_to_vec(content_feat1)
+        content_feat2 = self.feat_to_vec(content_feat2)
+
+        similarity_style = self.cosine_sim_01(style_feat1, style_feat2)
+        similarity_char = self.cosine_sim_01(content_feat1, content_feat2)
+
+        return similarity_style, similarity_char

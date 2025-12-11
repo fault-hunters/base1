@@ -1,0 +1,3 @@
+mxfont/data/**
+!mxfont/data/
+!mxfont/data/.gitkeep

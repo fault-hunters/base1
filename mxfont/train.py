@@ -134,7 +134,7 @@ def train(args, cfg, ddp_gpu=-1):
     logger.info("Build model ...")
     # generator
     g_kwargs = cfg.get("g_args", {})
-    gen = Generator(1, cfg.C, 1, **g_kwargs) # RGB input channel 1->3
+    gen = Generator(3, cfg.C, 1, **g_kwargs) # RGB input channel 1->3
     gen.cuda()
     gen.apply(weights_init(cfg.init))
 
