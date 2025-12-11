@@ -137,18 +137,20 @@ def train(args, cfg, ddp_gpu=-1):
     gen = Generator(3, cfg.C, 1, **g_kwargs) # RGB input channel 1->3
     gen.cuda()
     gen.apply(weights_init(cfg.init))
-
+    '''
     d_kwargs = cfg.get("d_args", {})
     disc = disc_builder(cfg.C, trn_dset.n_fonts, trn_dset.n_chars, **d_kwargs)
     disc.cuda()
     disc.apply(weights_init(cfg.init))
-
+    '''
     aux_clf = aux_clf_builder(gen.feat_shape["last"], trn_dset.n_fonts, n_comps, **cfg.ac_args)
     aux_clf.cuda()
     aux_clf.apply(weights_init(cfg.init))
 
-    g_optim = optim.Adam(gen.parameters(), lr=cfg.g_lr, betas=cfg.adam_betas)
-    d_optim = optim.Adam(disc.parameters(), lr=cfg.d_lr, betas=cfg.adam_betas)
+    g_optim = optim.Adam(gen.parameters(),
+                         lr=cfg.g_lr,
+                         betas=cfg.adam_betas)
+    #d_optim = optim.Adam(disc.parameters(), lr=cfg.d_lr, betas=cfg.adam_betas)
     ac_optim = optim.Adam(aux_clf.parameters(), lr=cfg.ac_lr, betas=cfg.adam_betas)
 
     st_step = 0
