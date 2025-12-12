@@ -88,3 +88,7 @@ print_freq: 1000
 val_freq: 10000
 save_freq: 50000
 tb_freq: 100
+img_freq: 1000
+
+# threshold
+threshold: 0.8
