@@ -9,7 +9,8 @@ primals: data/kor_en_primals.json   # path to the "primals" file.
 
 dset:   # leave blank
   train:   # leave blank
-    data_dir: data/ttfs/train   # path to .ttf files for the training
+    data_dir: data/train.csv   # path to .ttf files for the training
   val:   # leave blank
-    data_dir: data/ttfs/val   # path to .ttf files for the validation
-    source_font: data/ttfs/val/MaShanZheng-Regular.ttf   # path to the .ttf file used as the source font during the validation
+    data_dir: data/val.csv   # path to .ttf files for the validation
+  test:
+    data_dir: data/test.csv

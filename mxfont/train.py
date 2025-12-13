@@ -4,7 +4,6 @@ from trainer.pair_trainer import PairTrainer
 from datasets_img import get_img_loader
 import torch, torch.optim as optim
 from torchvision import transforms
-from sconf import Config, dump_args
 import utils
 from utils import Logger
 import numpy as np
@@ -29,10 +28,17 @@ def train(args, cfg):
         transforms.Normalize([0.5]*3, [0.5]*3) if cfg.dset_aug.normalize else lambda x: x,
     ])
     trn_dset, trn_loader = get_img_loader(
-        cfg.dset.train, trn_transform,
+        cfg.dset.train.data_dir, trn_transform,
         batch_size=cfg.batch_size,
         num_workers=cfg.n_workers,
         shuffle=True,
+    )
+
+    val_dset, val_loader = get_img_loader(
+        cfg.dset.val.data_dir, trn_transform,
+        batch_size=cfg.batch_size,
+        num_workers=cfg.n_workers,
+        shuffle=False,
     )
 
     trainer = PairTrainer(
@@ -51,16 +57,34 @@ def train(args, cfg):
             loss, acc, sim_s, sim_c, acc_s, acc_c = trainer.train_one_batch(
                 (imgA, imgB, label_s, label_c)
             )
-            if global_step % cfg.img_freq == 0:
-                grid = make_comparable_grid(imgA[:4].cpu(), imgB[:4].cpu(), nrow=4)
-                writer.add_image("train_pairs", grid, global_step)
 
             if global_step % img_freq == 0:
+                grid = make_comparable_grid(imgA[:4].cpu(), imgB[:4].cpu(), nrow=4)
+                writer.add_image("train_pairs", grid, global_step)
                 logger.info(
                     f"step {global_step} | loss {loss:.4f} | acc {acc*100:.2f}% "
                     f"| acc_s {acc_s*100:.2f}% | acc_c {acc_c*100:.2f}% "
                     f"| sim_s {sim_s.mean():.3f} | sim_c {sim_c.mean():.3f}"
                 )
+
+            if global_step % cfg.val_freq == 0:
+                gen.eval()
+                with torch.no_grad():
+                    acc_s_list, acc_c_list = [], []
+                    for vbatch in val_loader:
+                        _, acc_s_v, acc_c_v = trainer.eval_one_batch(vbatch)
+                        acc_s_list.append(acc_s_v)
+                        acc_c_list.append(acc_c_v)
+                    mean_acc_s = sum(acc_s_list)/len(acc_s_list)
+                    mean_acc_c = sum(acc_c_list)/len(acc_c_list)
+                    mean_acc = 0.5*(mean_acc_s + mean_acc_c)
+                    logger.info(
+                        f"[val] step {global_step} | acc {mean_acc*100:.2f}% "
+                        f"| acc_s {mean_acc_s*100:.2f}% | acc_c {mean_acc_c*100:.2f}%"
+                    )
+                gen.train()
+
+
             if global_step >= cfg.max_iter:
                 return
             global_step += 1

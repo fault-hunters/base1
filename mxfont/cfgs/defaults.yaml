@@ -26,16 +26,11 @@ dset_aug:
 dset:
   train:
     data_dir:
-    n_in_s: 3
-    n_in_c: 3
   val:
     data_dir:
-    n_ref: 4
-    source_font:
   test:
     data_dir:
-    source_font:
-    gen_chars_file:
+
 
 # model
 C: 32
@@ -84,11 +79,10 @@ indp_fact_w: 1.0
 
 # etc
 save: all-last
-print_freq: 1000
 val_freq: 10000
 save_freq: 50000
 tb_freq: 100
-img_freq: 1000
+img_freq: 10000
 
 # threshold
 threshold: 0.8
