@@ -3,7 +3,7 @@ port:
 
 batch_size: 8
 
-resume: 
+resume: # 가중치 경로 기입
 force_resume: False
 work_dir: ./result
 max_iter: 800000
@@ -86,3 +86,5 @@ img_freq: 10000
 
 # threshold
 threshold: 0.8
+#epoch
+epoch: 10000
