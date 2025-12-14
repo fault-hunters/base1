@@ -22,6 +22,8 @@ primals:
 dset_aug:
   normalize: True
   random_affine: False
+  rotation_deg: [-180, 180]  # 원하는 각도 범위 (스칼라 값도 가능)
+  rotation_p: 0.5  # 0이면 비활성
 
 dset:
   train:

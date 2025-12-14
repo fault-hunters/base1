@@ -8,6 +8,7 @@ from datasets_img import get_img_loader
 
 def build_transform(cfg):
     return transforms.Compose([
+        transforms.RandomApply([transforms.RandomRotation(cfg.dset_aug.rotation_deg, fill=0)], p=cfg.dset_aug.rotation_p),
         transforms.Resize((128, 128)),
         transforms.ToTensor(),
         transforms.Normalize([0.5]*3, [0.5]*3) if cfg.dset_aug.normalize else lambda x: x,
