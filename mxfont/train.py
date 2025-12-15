@@ -9,6 +9,8 @@ from utils import Logger
 import numpy as np
 from utils.visualize import make_comparable_grid
 from pathlib import Path
+import argparse
+from sconf import Config
 
 # setup_args_and_config: 동일 구조, work_dir 준비, n_workers 조정
 # setup_transforms: Resize -> ToTensor (+ Normalize)
@@ -111,3 +113,17 @@ def train(args, cfg):
             if global_step >= cfg.max_iter:
                 return
             global_step += 1
+
+def parse_cfg():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("config_paths", nargs="+", help="path to config.yaml")
+    args, left = parser.parse_known_args()
+    cfg = Config(*args.config_paths, default="cfgs/defaults.yaml")
+    cfg.argv_update(left)
+    return args, cfg
+
+if __name__ == "__main__":
+    args, cfg = parse_cfg()
+    np.random.seed(cfg.seed)
+    torch.manual_seed(cfg.seed)
+    train(args, cfg)
