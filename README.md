@@ -12,3 +12,7 @@
     ```
     python eval.py cfgs/train.yaml --weight path/to/gen_xxx.pth
     ```
+- inference
+    ```
+    python mxfont/char_comparison_api.py --weight mxfont/generator.pth --imgA path/to/a.png --imgB path/to/b.png
+    ```
