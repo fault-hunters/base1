@@ -72,7 +72,7 @@ def train(args, cfg):
     for epoch in range(cfg.epoch):
         for batch in trn_loader:
             imgA, imgB, label_s, label_c = batch  # 샘플 저장용으로 언팩
-            loss, acc, sim_s, sim_c, acc_s, acc_c = trainer.train_one_batch(
+            loss, loss_s, loss_c, acc, sim_s, sim_c, acc_s, acc_c = trainer.train_one_batch(
                 (imgA, imgB, label_s, label_c)
             )
 
@@ -80,25 +80,34 @@ def train(args, cfg):
                 grid = make_comparable_grid(imgA[:4].cpu(), imgB[:4].cpu(), nrow=4)
                 writer.add_image("train_pairs", grid, global_step)
                 logger.info(
-                    f"[epoch {epoch+1}] step {global_step} | loss {loss:.4f} | acc {acc*100:.2f}% "
+                    f"[epoch {epoch+1}] step {global_step} | loss {loss:.4f} "
+                    f"| loss_s {loss_s:.4f} | loss_c {loss_c:.4f} | acc {acc*100:.2f}% "
                     f"| acc_s {acc_s*100:.2f}% | acc_c {acc_c*100:.2f}% "
                     f"| sim_s {sim_s.mean().item():.3f} | sim_c {sim_c.mean().item():.3f}"
                 )
 
             if (global_step % cfg.val_freq == 0) and (global_step > 0):
                 gen.eval()
-                total_s = total_c = total = 0
+                total_loss = total_loss_s = total_loss_c = total_s = total_c = total = 0
                 with torch.no_grad():
                     for vbatch in val_loader:
-                        _, acc_s_v, acc_c_v, bs = trainer.eval_one_batch(vbatch)
+                        loss_v, loss_s_v, loss_c_v, acc_v, acc_s_v, acc_c_v, bs = trainer.eval_one_batch(vbatch)
+                        total_loss += loss_v * bs
+                        total_loss_s += loss_s_v * bs
+                        total_loss_c += loss_c_v * bs
                         total_s += acc_s_v * bs
                         total_c += acc_c_v * bs
                         total += bs
+                    mean_loss = total_loss / total
+                    mean_loss_s = total_loss_s / total
+                    mean_loss_c = total_loss_c / total
                     mean_acc_s = total_s / total
                     mean_acc_c = total_c / total
                     mean_acc = 0.5 * (mean_acc_s + mean_acc_c)
                     logger.info(
-                        f"[val] step {global_step} | acc {mean_acc*100:.2f}% "
+                        f"[val] step {global_step} | loss {mean_loss:.4f} "
+                        f"| loss_s {mean_loss_s:.4f} | loss_c {mean_loss_c:.4f} "
+                        f"| acc {mean_acc*100:.2f}% "
                         f"| acc_s {mean_acc_s*100:.2f}% | acc_c {mean_acc_c*100:.2f}%"
                     )
                 gen.train()

@@ -84,9 +84,9 @@ save: all-last
 val_freq: 10000
 save_freq: 50000
 tb_freq: 100
-img_freq: 10000
+img_freq: 1250
 
 # threshold
 threshold: 0.8
 #epoch
-epoch: 10000
+epoch: 1000

@@ -42,7 +42,16 @@ class PairTrainer:
             acc_c = (pred_c == label_c).float().mean()
             acc = 0.5 * (acc_s + acc_c)
 
-        return loss.item(), acc.item(), sim_s.detach(), sim_c.detach(), acc_s.item(), acc_c.item()
+        return (
+            loss.item(),
+            loss_s.item(),
+            loss_c.item(),
+            acc.item(),
+            sim_s.detach(),
+            sim_c.detach(),
+            acc_s.item(),
+            acc_c.item(),
+        )
 
     @torch.no_grad()
     def eval_one_batch(self, batch):
@@ -52,10 +61,21 @@ class PairTrainer:
         label_c = label_c.to(self.device).view(-1)
 
         sim_s, sim_c = self.forward_pair(imgA, imgB)
+        loss_s = F.binary_cross_entropy(sim_s, label_s)
+        loss_c = F.binary_cross_entropy(sim_c, label_c)
+        loss = self.w_style * loss_s + self.w_content * loss_c
         pred_s = (sim_s >= self.threshold).float()
         pred_c = (sim_c >= self.threshold).float()
         acc_s = (pred_s == label_s).float().mean()
         acc_c = (pred_c == label_c).float().mean()
         acc = 0.5 * (acc_s + acc_c)
         bs = label_s.size(0)
-        return acc.item(), acc_s.item(), acc_c.item(), bs
+        return (
+            loss.item(),
+            loss_s.item(),
+            loss_c.item(),
+            acc.item(),
+            acc_s.item(),
+            acc_c.item(),
+            bs,
+        )
