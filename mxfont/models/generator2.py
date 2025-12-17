@@ -35,7 +35,11 @@ class Generator(nn.Module):
         super().__init__()
         self.style_enc = style_enc_builder(
             C_in, C, **style_enc)
-        self.experts = exp_builder(C, **experts)
+        self.experts_s = exp_builder(C, **experts)
+
+        self.contnet_enc = style_enc_builder(
+            C_in, C, **style_enc)
+        self.experts_c = exp_builder(C, **experts)
 
         self.n_experts = self.experts.n_experts
         self.feat_shape = {"last": self.experts.out_shape, "skip": self.experts.skip_shape}
@@ -59,9 +63,15 @@ class Generator(nn.Module):
         self.fact_blocks = nn.ModuleDict(self.fact_blocks)
         self.recon_blocks = nn.ModuleDict(self.recon_blocks)
 
-    def encode(self, img):
+    def style_encode(self, img):
         feats = self.style_enc(img)
-        feats = self.experts(feats)
+        feats = self.experts_s(feats)
+
+        return feats
+    
+    def content_encode(self, img):
+        feats = self.contnet_enc(img)
+        feats = self.experts_c(feats)
 
         return feats
 
@@ -89,8 +99,8 @@ class Generator(nn.Module):
         return v
 
     def extract_style_content(self, img: torch.Tensor):
-        style_facts = self.encode(img)
-        char_facts = self.encode(img)   # experts까지
+        style_facts = self.style_encode(img)
+        char_facts = self.content_encode(img)   # experts까지
         style_facts = self.factorize(style_facts, 0)
         char_facts  = self.factorize(char_facts, 1)
 
