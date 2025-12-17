@@ -70,7 +70,7 @@ def compare_images(
     """
     imgA_path, imgB_path: 비교할 이미지 경로
     weight_path: 학습된 generator 가중치(.pth)
-    cfg_path: sconf 설정 파일 경로 (기본: mxfont/cfgs/eval.yaml)
+    cfg_path: sconf 설정 파일 경로(선택). 없으면 defaults.yaml만 사용
     """
     base_dir = Path(__file__).parent
     cfg_paths = [cfg_path] if cfg_path else []
@@ -128,11 +128,11 @@ def compare_images(
 
 def main():
     ap = argparse.ArgumentParser(description="두 이미지 스타일/컨텐츠 비교")
-    ap.add_argument("--cfg", default=None, help="설정 파일 경로 (기본: mxfont/cfgs/eval.yaml)")
+    ap.add_argument("--cfg", default=None, help="설정 파일 경로(선택). 없으면 defaults.yaml만 사용")
     ap.add_argument("--weight", required=False, help="generator 가중치 경로 (.pth)")
     ap.add_argument("--imgA", required=False, help="비교할 첫 번째 이미지 경로")
     ap.add_argument("--imgB", required=False, help="비교할 두 번째 이미지 경로")
-    ap.add_argument("--save_dir", default=None, help="지정 시 imgA/imgB + 유사도 히트맵 PNG 저장 디렉터리")
+    ap.add_argument("--save_dir", default='./test_map', help="지정 시 imgA/imgB + 유사도 히트맵 PNG 저장 디렉터리")
     args = ap.parse_args()
 
     # 인자를 생략하면 실행 시 입력()으로 받음
