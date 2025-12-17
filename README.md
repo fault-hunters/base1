@@ -10,7 +10,7 @@
     ```
 - test
     ```
-    python eval.py cfgs/train.yaml --weight path/to/gen_xxx.pth
+    python eval.py cfgs/eval.yaml --weight path/to/gen_xxx.pth
     ```
 - inference
     ```

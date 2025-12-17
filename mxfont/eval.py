@@ -111,8 +111,8 @@ def main():
     acc, acc_s, acc_c, metrics = evaluate(gen, val_loader, device, cfg.threshold)
     print(f"[test] acc {acc*100:.2f}% | acc_s {acc_s*100:.2f}% | acc_c {acc_c*100:.2f}% "
           f"| macro_f1 {metrics['macro_f1']:.3f} | f1_s {metrics['style']['f1']:.3f} | f1_c {metrics['content']['f1']:.3f}")
-    print(f"style cm [[tn, fp], [fn, tp]] = {metrics['style']['cm']}")
-    print(f"content cm [[tn, fp], [fn, tp]] = {metrics['content']['cm']}")
+    print(f"style cm [[tn, fp], [fn, tp]] = {metrics['style']['cm']} | precision = {metrics['style']['precision']} | recall = {metrics['style']['recall']}")
+    print(f"content cm [[tn, fp], [fn, tp]] = {metrics['content']['cm']} | precision = {metrics['content']['precision']} | recall = {metrics['content']['recall']}")
 
 if __name__ == "__main__":
     main()
