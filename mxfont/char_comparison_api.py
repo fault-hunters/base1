@@ -17,6 +17,7 @@ import utils
 
 def _build_transform(cfg):
     return transforms.Compose([
+        transforms.RandomApply([transforms.RandomRotation(cfg.dset_aug.rotation_deg, fill=0)], p=cfg.dset_aug.rotation_p),
         transforms.Resize((128, 128)),
         transforms.ToTensor(),
         transforms.Normalize([0.5] * 3, [0.5] * 3) if cfg.dset_aug.normalize else lambda x: x,
@@ -25,7 +26,7 @@ def _build_transform(cfg):
 
 def _load_gen(cfg, weight_path: Path, device: torch.device) -> Generator:
     gen = Generator(3, cfg.C, 1, **cfg.get("g_args", {})).to(device)
-    state = torch.load(weight_path, map_location=device)
+    state = torch.load(weight_path, map_location=device, weights_only=False)
     if isinstance(state, dict) and "gen" in state:
         state = state["gen"]
     elif isinstance(state, dict) and "state_dict" in state:

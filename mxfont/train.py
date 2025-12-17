@@ -1,4 +1,5 @@
-from models import Generator
+#from models import Generator
+from models.generator2 import Generator
 from models.modules import weights_init
 from trainer.pair_trainer import PairTrainer
 from datasets_img import get_img_loader
