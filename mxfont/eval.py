@@ -18,6 +18,8 @@ def build_transform(cfg):
 def evaluate(gen, loader, device, threshold):
     gen.eval()
     total_s = total_c = total = 0
+    tp_s = fp_s = fn_s = tn_s = 0
+    tp_c = fp_c = fn_c = tn_c = 0
     for imgA, imgB, label_s, label_c in loader:
         imgA = imgA.to(device); imgB = imgB.to(device)
         label_s = label_s.to(device).view(-1)
@@ -37,15 +39,39 @@ def evaluate(gen, loader, device, threshold):
         total_s += acc_s * bs
         total_c += acc_c * bs
         total += bs
+        tp_s += ((pred_s == 1) & (label_s == 1)).sum().item()
+        fp_s += ((pred_s == 1) & (label_s == 0)).sum().item()
+        fn_s += ((pred_s == 0) & (label_s == 1)).sum().item()
+        tn_s += ((pred_s == 0) & (label_s == 0)).sum().item()
+        tp_c += ((pred_c == 1) & (label_c == 1)).sum().item()
+        fp_c += ((pred_c == 1) & (label_c == 0)).sum().item()
+        fn_c += ((pred_c == 0) & (label_c == 1)).sum().item()
+        tn_c += ((pred_c == 0) & (label_c == 0)).sum().item()
     mean_acc_s = total_s / total
     mean_acc_c = total_c / total
     mean_acc = 0.5 * (mean_acc_s + mean_acc_c)
     mean_acc, mean_acc_s, mean_acc_c = mean_acc.item(), mean_acc_s.item(), mean_acc_c.item()
-    return mean_acc, mean_acc_s, mean_acc_c
+
+    def _f1(tp, fp, fn, tn):
+        precision = tp / (tp + fp + 1e-12)
+        recall = tp / (tp + fn + 1e-12)
+        f1 = 2 * precision * recall / (precision + recall + 1e-12)
+        return f1, precision, recall, [[tn, fp], [fn, tp]]
+
+    f1_s, prec_s, rec_s, cm_s = _f1(tp_s, fp_s, fn_s, tn_s)
+    f1_c, prec_c, rec_c, cm_c = _f1(tp_c, fp_c, fn_c, tn_c)
+    macro_f1 = 0.5 * (f1_s + f1_c)
+
+    metrics = {
+        "macro_f1": macro_f1,
+        "style": {"f1": f1_s, "precision": prec_s, "recall": rec_s, "cm": cm_s},
+        "content": {"f1": f1_c, "precision": prec_c, "recall": rec_c, "cm": cm_c},
+    }
+    return mean_acc, mean_acc_s, mean_acc_c, metrics
 
 def load_gen(cfg, weight_path, device):
     gen = Generator(3, cfg.C, 1, **cfg.get("g_args", {})).to(device)
-    state = torch.load(weight_path, map_location=device)
+    state = torch.load(weight_path, map_location=device, weights_only=False)
     # 허용: state가 dict로 감싸졌거나 gen만 있을 때 모두 대응
     if isinstance(state, dict) and "state_dict" in state:
         state = state["state_dict"]
@@ -82,8 +108,11 @@ def main():
     )
 
     gen = load_gen(cfg, args.weight, device)
-    acc, acc_s, acc_c = evaluate(gen, val_loader, device, cfg.threshold)
-    print(f"[test] acc {acc*100:.2f}% | acc_s {acc_s*100:.2f}% | acc_c {acc_c*100:.2f}%")
+    acc, acc_s, acc_c, metrics = evaluate(gen, val_loader, device, cfg.threshold)
+    print(f"[test] acc {acc*100:.2f}% | acc_s {acc_s*100:.2f}% | acc_c {acc_c*100:.2f}% "
+          f"| macro_f1 {metrics['macro_f1']:.3f} | f1_s {metrics['style']['f1']:.3f} | f1_c {metrics['content']['f1']:.3f}")
+    print(f"style cm [[tn, fp], [fn, tp]] = {metrics['style']['cm']}")
+    print(f"content cm [[tn, fp], [fn, tp]] = {metrics['content']['cm']}")
 
 if __name__ == "__main__":
     main()
