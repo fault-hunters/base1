@@ -44,7 +44,8 @@ class Generator(nn.Module):
         self.n_experts = self.experts_c.n_experts
         self.feat_shape = {"last": self.experts_c.out_shape, "skip": self.experts_c.skip_shape}
 
-        self.fact_blocks = {}
+        self.fact_blocks_s = {}
+        self.fact_blocks_c = {}
         self.recon_blocks = {}
 
         self.C_l = self.feat_shape["last"][0]
@@ -55,12 +56,15 @@ class Generator(nn.Module):
         self.emb_num = emb_num
         for _key in self.feat_shape:
             _feat_C = self.feat_shape[_key][0]
-            self.fact_blocks[_key] = nn.ModuleList([nn.Conv2d(_feat_C, emb_num*_feat_C, 1, 1)
+            self.fact_blocks_s[_key] = nn.ModuleList([nn.Conv2d(_feat_C, emb_num*_feat_C, 1, 1)
+                                                    for _ in range(self.n_experts)])
+            self.fact_blocks_c[_key] = nn.ModuleList([nn.Conv2d(_feat_C, emb_num*_feat_C, 1, 1)
                                                     for _ in range(self.n_experts)])
             self.recon_blocks[_key] = nn.ModuleList([nn.Conv2d(emb_num*_feat_C, _feat_C, 1, 1)
                                                     for _ in range(self.n_experts)])
 
-        self.fact_blocks = nn.ModuleDict(self.fact_blocks)
+        self.fact_blocks_c = nn.ModuleDict(self.fact_blocks_c)
+        self.fact_blocks_s = nn.ModuleDict(self.fact_blocks_s)
         self.recon_blocks = nn.ModuleDict(self.recon_blocks)
 
     def style_encode(self, img):
@@ -75,7 +79,7 @@ class Generator(nn.Module):
 
         return feats
 
-    def factorize(self, feats, emb_dim=0):
+    def factorize_s(self, feats, emb_dim=0):
         if self.emb_num is None:
             raise ValueError("embedding blocks are not defined.")
 
@@ -83,7 +87,23 @@ class Generator(nn.Module):
         for _key, _feat in feats.items():
             _fact = []
             for _i in range(self.n_experts):
-                _fact_i = self.fact_blocks[_key][_i](_feat[:, _i])
+                _fact_i = self.fact_blocks_s[_key][_i](_feat[:, _i])
+                _fact_i = utils.add_dim_and_reshape(_fact_i, 1, (self.emb_num, -1))  # (bs*n_s, n_exp, emb_num, *feat_shape)
+                _fact.append(_fact_i[:, emb_dim])
+            _fact = torch.stack(_fact, dim=1)
+            factors[_key] = _fact
+
+        return factors
+
+    def factorize_c(self, feats, emb_dim=1):
+        if self.emb_num is None:
+            raise ValueError("embedding blocks are not defined.")
+
+        factors = {}
+        for _key, _feat in feats.items():
+            _fact = []
+            for _i in range(self.n_experts):
+                _fact_i = self.fact_blocks_c[_key][_i](_feat[:, _i])
                 _fact_i = utils.add_dim_and_reshape(_fact_i, 1, (self.emb_num, -1))  # (bs*n_s, n_exp, emb_num, *feat_shape)
                 _fact.append(_fact_i[:, emb_dim])
             _fact = torch.stack(_fact, dim=1)
@@ -101,8 +121,8 @@ class Generator(nn.Module):
     def extract_style_content(self, img: torch.Tensor):
         style_facts = self.style_encode(img)
         char_facts = self.content_encode(img)   # experts까지
-        style_facts = self.factorize(style_facts, 0)
-        char_facts  = self.factorize(char_facts, 1)
+        style_facts = self.factorize_s(style_facts, 0)
+        char_facts  = self.factorize_c(char_facts, 1)
 
         style_last = style_facts["last"].mean(1)
         style_skip = style_facts["skip"].mean(1)

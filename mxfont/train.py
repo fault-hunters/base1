@@ -19,6 +19,13 @@ from sconf import Config
 def train(args, cfg):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     gen = Generator(3, cfg.C, 1, **cfg.get("g_args", {})).to(device)
+
+    '''
+    for m in [gen.style_enc, gen.experts_s, gen.fuser_style, gen.fact_blocks_s]:
+        for p in m.parameters():
+            p.requires_grad = False
+    '''
+
     optim_g = optim.Adam(gen.parameters(), lr=cfg.g_lr, betas=cfg.adam_betas)
     
     if cfg.resume:
