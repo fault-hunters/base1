@@ -41,8 +41,8 @@ class Generator(nn.Module):
             C_in, C, **style_enc)
         self.experts_c = exp_builder(C, **experts)
 
-        self.n_experts = self.experts.n_experts
-        self.feat_shape = {"last": self.experts.out_shape, "skip": self.experts.skip_shape}
+        self.n_experts = self.experts_c.n_experts
+        self.feat_shape = {"last": self.experts_c.out_shape, "skip": self.experts_c.skip_shape}
 
         self.fact_blocks = {}
         self.recon_blocks = {}
