@@ -72,7 +72,8 @@ def train(args, cfg):
         gen, optim_g, logger, device=device,
         w_style=cfg.get("w_style", 1.0),
         w_content=cfg.get("w_content", 1.0),
-        threshold=cfg.threshold,
+        threshold_s=cfg.threshold_s,
+        threshold_c=cfg.threshold_c,
     )
 
     img_freq = getattr(cfg, "img_freq", 1000)

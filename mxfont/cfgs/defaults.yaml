@@ -87,6 +87,7 @@ tb_freq: 100
 img_freq: 1250
 
 # threshold
-threshold: 0.8
+threshold_s: 0.8
+threshold_c: 0.8
 #epoch
 epoch: 1000

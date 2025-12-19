@@ -2,14 +2,15 @@ import torch
 import torch.nn.functional as F
 
 class PairTrainer:
-    def __init__(self, gen, optim, logger, device="cuda", w_style=1.0, w_content=1.0, threshold = 0.8):
+    def __init__(self, gen, optim, logger, device="cuda", w_style=1.0, w_content=1.0, threshold_s = 0.8, threshold_c = 0.8):
         self.gen = gen.to(device).train()
         self.optim = optim
         self.logger = logger
         self.device = device
         self.w_style = w_style
         self.w_content = w_content
-        self.threshold = threshold
+        self.threshold_s = threshold_s
+        self.threshold_c = threshold_c
 
     def forward_pair(self, imgA, imgB):
         sA, cA = self.gen.extract_style_content(imgA)
@@ -36,8 +37,8 @@ class PairTrainer:
         self.optim.step()
 
         with torch.no_grad():
-            pred_s = (sim_s >= self.threshold).float()
-            pred_c = (sim_c >= self.threshold).float()
+            pred_s = (sim_s >= self.threshold_s).float()
+            pred_c = (sim_c >= self.threshold_c).float()
             acc_s = (pred_s == label_s).float().mean()
             acc_c = (pred_c == label_c).float().mean()
             acc = 0.5 * (acc_s + acc_c)
@@ -64,8 +65,8 @@ class PairTrainer:
         loss_s = F.binary_cross_entropy(sim_s, label_s)
         loss_c = F.binary_cross_entropy(sim_c, label_c)
         loss = self.w_style * loss_s + self.w_content * loss_c
-        pred_s = (sim_s >= self.threshold).float()
-        pred_c = (sim_c >= self.threshold).float()
+        pred_s = (sim_s >= self.threshold_s).float()
+        pred_c = (sim_c >= self.threshold_c).float()
         acc_s = (pred_s == label_s).float().mean()
         acc_c = (pred_c == label_c).float().mean()
         acc = 0.5 * (acc_s + acc_c)

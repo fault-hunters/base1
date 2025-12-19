@@ -95,7 +95,8 @@ def compare_images(
     sim_s = (sim_s + 1) / 2 # 0~1범위로 스케일링
     sim_c = (sim_c + 1) / 2 # 0~1범위로 스케일링
 
-    thr = cfg.threshold
+    thr_s = cfg.threshold_s
+    thr_c = cfg.threshold_c
     if save_dir is not None:
         save_dir = Path(save_dir)
         save_dir.mkdir(parents=True, exist_ok=True)
@@ -121,9 +122,10 @@ def compare_images(
     return {
         "style_sim": float(sim_s.item()),
         "content_sim": float(sim_c.item()),
-        "style_pred": "OK" if sim_s.item() >= thr else "NG",
-        "content_pred": "OK" if sim_c.item() >= thr else "NG",
-        "threshold": float(thr),
+        "style_pred": "OK" if sim_s.item() >= thr_s else "NG",
+        "content_pred": "OK" if sim_c.item() >= thr_c else "NG",
+        "threshold_c": float(thr_c),
+        "threshold_s": float(thr_s)
     }
 
 
@@ -151,11 +153,11 @@ def main():
 
     print(
         f"style_sim={result['style_sim']:.3f} -> {result['style_pred']} "
-        f"(thr={result['threshold']})"
+        f"(thr(s)={result['threshold_s']})"
     )
     print(
         f"content_sim={result['content_sim']:.3f} -> {result['content_pred']} "
-        f"(thr={result['threshold']})"
+        f"(thr(c)={result['threshold_c']})"
     )
 
 
