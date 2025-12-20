@@ -1,7 +1,7 @@
 use_ddp: False
 port:
 
-batch_size: 8
+batch_size: 64
 
 resume: # 가중치 경로 기입
 force_resume: False
@@ -81,10 +81,10 @@ indp_fact_w: 1.0
 
 # etc
 save: all-last
-val_freq: 10000
-save_freq: 50000
+val_freq: 1000
+save_freq: 1000
 tb_freq: 100
-img_freq: 1250
+img_freq: 1000
 
 # threshold
 threshold_s: 0.8

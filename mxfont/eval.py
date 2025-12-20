@@ -4,7 +4,8 @@ import torch
 import torch.nn.functional as F
 from torchvision import transforms
 from sconf import Config
-from models import Generator
+# from models import Generator
+from models.generator2 import Generator
 from datasets_img import get_img_loader
 import utils
 
@@ -24,9 +25,10 @@ def build_transform(cfg):
 
 @torch.no_grad()
 def _extract_style_content_maps(gen: Generator, img: torch.Tensor):
-    feats = gen.encode(img)
-    style_facts = gen.factorize(feats, 0)
-    char_facts = gen.factorize(feats, 1)
+    style_facts = gen.style_encode(img)
+    char_facts = gen.content_encode(img)
+    style_facts = gen.factorize_s(style_facts, 0)
+    char_facts = gen.factorize_c(char_facts, 1)
 
     style_last = style_facts["last"].mean(1)
     style_skip = style_facts["skip"].mean(1)
@@ -46,7 +48,7 @@ def _cosine_sim_map(featA: torch.Tensor, featB: torch.Tensor, out_hw=None) -> to
     return sim
 
 @torch.no_grad()
-def evaluate(gen, loader, device, threshold, vis_dir: Path = None, vis_n: int = 0, normalize: bool = True):
+def evaluate(gen, loader, device, threshold_s, threshold_c, vis_dir: Path = None, vis_n: int = 0, normalize: bool = True):
     gen.eval()
     total_s = total_c = total = 0
     tp_s = fp_s = fn_s = tn_s = 0
@@ -64,8 +66,8 @@ def evaluate(gen, loader, device, threshold, vis_dir: Path = None, vis_n: int = 
         sim_s = (sim_s + 1) / 2
         sim_c = (sim_c + 1) / 2
 
-        pred_s = (sim_s >= threshold).float()
-        pred_c = (sim_c >= threshold).float()
+        pred_s = (sim_s >= threshold_s).float()
+        pred_c = (sim_c >= threshold_c).float()
         acc_s = (pred_s == label_s).float().mean()
         acc_c = (pred_c == label_c).float().mean()
         total_s += acc_s * bs
@@ -173,7 +175,8 @@ def main():
         gen,
         val_loader,
         device,
-        cfg.threshold,
+        cfg.threshold_s,
+        cfg.threshold_c,
         vis_dir=Path(args.vis_dir) if args.vis_dir else None,
         vis_n=args.vis_n,
         normalize=bool(cfg.dset_aug.normalize),

@@ -20,22 +20,24 @@ def train(args, cfg):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     gen = Generator(3, cfg.C, 1, **cfg.get("g_args", {})).to(device)
 
-    '''
+    
     for m in [gen.style_enc, gen.experts_s, gen.fuser_style, gen.fact_blocks_s]:
         for p in m.parameters():
             p.requires_grad = False
-    '''
+    
 
     optim_g = optim.Adam(gen.parameters(), lr=cfg.g_lr, betas=cfg.adam_betas)
     
     if cfg.resume:
-        state = torch.load(cfg.resume, map_location=device)
+        print(cfg.resume)
+        state = torch.load(cfg.resume, map_location=device, weights_only=False)
         gen.load_state_dict(state.get("gen", state))
         if "optim_g" in state:
             optim_g.load_state_dict(state["optim_g"])
         global_step = state.get("step", 0) + 1  # 위 설명 참고
         if global_step >= cfg.max_iter: return
     else:
+        print("No Weight")
         gen.apply(weights_init(cfg.init))
         global_step = 1
 
