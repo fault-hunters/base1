@@ -1,3 +1,4 @@
 mxfont/data/**
 !mxfont/data/
 !mxfont/data/.gitkeep
+new_api/config.yaml
