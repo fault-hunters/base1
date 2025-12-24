@@ -16,3 +16,9 @@
     ```
     python mxfont/char_comparison_api.py --weight mxfont/generator.pth --imgA path/to/a.png --imgB path/to/b.png
     ```
+
+## Image Generating
+- generating_tar_img.py
+```
+python "new_api/generating_tar_img.py"
+```
