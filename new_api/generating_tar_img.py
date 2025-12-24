@@ -28,14 +28,8 @@ def save_images(response, name: str, out_dir: Path) -> list[Path]:
                 saved.append(out_path)
                 idx += 1
 
-    candidates = getattr(response, "candidates", None) or []
-    print("batch :",candidates)
-    if candidates:
-        for cand in candidates:
-            content = getattr(cand, "content", None)
-            handle_parts(getattr(content, "parts", None))
-    else:
-        handle_parts(getattr(response, "parts", None))
+
+    handle_parts(getattr(response, "parts", None))
 
     # 텍스트만 오는 경우(response에 이미지 없을 때)
     if not saved and getattr(response, "text", None):
@@ -74,10 +68,8 @@ def call_gemini(mykey, ref_img, prompt):
     # gemini 호출
     response = client.models.generate_content(
         model=info["gemini"]["model"],
-        temperature = 0.8,
         contents=contents,
         config=types.GenerateContentConfig(
-            candidate_count=info["gemini"]["batch"],
             response_modalities=["IMAGE"],
             image_config=types.ImageConfig(
                 aspect_ratio=info["gemini"]["aspect_ratio"],
@@ -92,14 +84,13 @@ def call_gemini(mykey, ref_img, prompt):
     return saved
 
 def main():
+    print("start")
     gpt_key = info["gpt"]["key"]
     df = pd.read_csv("data.csv") # 파일 받기
     # 프롬프트 리스트 파일 불러오기
-    user_prompt = df["col1"].tolist()
+    user_prompt = df["col1"].tolist() # 사용자 프롬프트.
     # 레퍼런스 리스트 파일 불러오기
-    input_ref = df["col2"].tolist()
-    user_prompt = list() # 사용자 프롬프트.
-    input_ref = list() # 여기에 넣을 reference 이미지 경로
+    input_ref = df["col2"].tolist() # 여기에 넣을 reference 이미지 경로
     for user in user_prompt:
         for input_img in input_ref:
             # 프롬프트 생성(gemini에 넣을 프롬프트 생성)
