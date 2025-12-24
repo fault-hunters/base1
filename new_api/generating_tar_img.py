@@ -4,6 +4,7 @@ import yaml
 
 from google import genai
 from google.genai import types
+import pandas as pd
 
 # 지침 불러오기(.txt)
 guide_path = Path(__file__).resolve().parent / "prompting_guide.txt"
@@ -22,7 +23,7 @@ def save_images(response, name: str, out_dir: Path) -> list[Path]:
         for part in parts or []:
             if getattr(part, "inline_data", None):
                 img = part.as_image()
-                out_path = out_dir / f"{name}_{idx:02d}.png"  # 저장할 생성 이미지 이름
+                out_path = out_dir / f"{name}_tgt{idx:02d}.png"  # 저장할 생성 이미지 이름
                 img.save(out_path)
                 saved.append(out_path)
                 idx += 1
@@ -50,6 +51,7 @@ def call_gpt(mykey: str, user_prompt: str) -> str:
     )
     response = client.responses.create(
         model=info["gpt"]["model"],
+        temperature = 0.8,
         input=[
             {"role": "system", "content": system_instructions},
             {"role": "user", "content": final_user_content},
@@ -72,6 +74,7 @@ def call_gemini(mykey, ref_img, prompt):
     # gemini 호출
     response = client.models.generate_content(
         model=info["gemini"]["model"],
+        temperature = 0.8,
         contents=contents,
         config=types.GenerateContentConfig(
             candidate_count=info["gemini"]["batch"],
@@ -90,23 +93,32 @@ def call_gemini(mykey, ref_img, prompt):
 
 def main():
     gpt_key = info["gpt"]["key"]
+    df = pd.read_csv("data.csv") # 파일 받기
     # 프롬프트 리스트 파일 불러오기
+    user_prompt = df["col1"].tolist()
     # 레퍼런스 리스트 파일 불러오기
+    input_ref = df["col2"].tolist()
     user_prompt = list() # 사용자 프롬프트.
     input_ref = list() # 여기에 넣을 reference 이미지 경로
     for user in user_prompt:
         for input_img in input_ref:
             # 프롬프트 생성(gemini에 넣을 프롬프트 생성)
             gen_prompt = call_gpt(gpt_key, user)
+            print("📷reference image📷")
+            print(input_img)
+            print("✅생성된 프롬프트✅")
             print(gen_prompt)
+            print()
 
             # 제미나이 이미지 생성
             gemini_key = info["gemini"]["key"]
             saved_img = call_gemini(gemini_key, input_img, gen_prompt)
-            print(f'Model: {info["gemini"]["model"]}')
-            print(f'Output: {Path(info["output"]["output_dir"]).resolve()}')
+
+            print(f'🤖Model: {info["gemini"]["model"]}')
+            print(f'📊Output: {Path(info["output"]["output_dir"]).resolve()}')
             for p in saved_img:
-                print(f"Saved:  {p.resolve()}")
+                print(f"💾Saved:  {p.resolve()}")
+            print("--------------------------------------------------")
 
 if __name__ == "__main__":
     main()
