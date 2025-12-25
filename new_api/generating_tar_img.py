@@ -5,21 +5,21 @@ import yaml
 from google import genai
 from google.genai import types
 import pandas as pd
+import random
 
 # 지침 불러오기(.txt)
 guide_path = Path(__file__).resolve().parent / "prompting_guide.txt"
 system_instructions = guide_path.read_text(encoding="utf-8")
 cfg_path = Path("config.yaml")
 info = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+idx = 0
 
 def save_images(response, name: str, out_dir: Path) -> list[Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     saved = []
-    idx = 0
-
+    
     # 응답의 part들 중 inline_data가 이미지입니다. :contentReference[oaicite:1]{index=1}
     def handle_parts(parts):
-        nonlocal idx
         for part in parts or []:
             if getattr(part, "inline_data", None):
                 img = part.as_image()
@@ -88,13 +88,16 @@ def main():
     gpt_key = info["gpt"]["key"]
     df = pd.read_csv("data.csv") # 파일 받기
     # 프롬프트 리스트 파일 불러오기
-    user_prompt = df["col1"].tolist() # 사용자 프롬프트.
+    user_prompt = df["prompt"].tolist() # 사용자 프롬프트.
     # 레퍼런스 리스트 파일 불러오기
-    input_ref = df["col2"].tolist() # 여기에 넣을 reference 이미지 경로
-    for user in user_prompt:
-        for input_img in input_ref:
+    input_ref = df["ref_path"].tolist() # 여기에 넣을 reference 이미지 경로
+    numbers = random.sample(range(0,len(user_prompt)), 10)  # prompt index 랜덤으로 10개 뽑기
+    gen_img_info = []
+    print(numbers)
+    for input_img in input_ref:
+        for i in numbers:
             # 프롬프트 생성(gemini에 넣을 프롬프트 생성)
-            gen_prompt = call_gpt(gpt_key, user)
+            gen_prompt = call_gpt(gpt_key, user_prompt[i])
             print("📷reference image📷")
             print(input_img)
             print("✅생성된 프롬프트✅")
@@ -109,7 +112,12 @@ def main():
             print(f'📊Output: {Path(info["output"]["output_dir"]).resolve()}')
             for p in saved_img:
                 print(f"💾Saved:  {p.resolve()}")
+                gen_img_info.append({"ref_img" : input_img, "gen_img" : p, "using_prompt" : i})
             print("--------------------------------------------------")
+
+            # 생성 정보 저장
+    gen_img_info_df = pd.DataFrame(gen_img_info)
+    gen_img_info_df.to_csv("gen_img_info.csv",encoding="utf-8",sep=',')
 
 if __name__ == "__main__":
     main()
