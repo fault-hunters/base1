@@ -12,9 +12,8 @@ guide_path = Path(__file__).resolve().parent / "prompting_guide.txt"
 system_instructions = guide_path.read_text(encoding="utf-8")
 cfg_path = Path("config.yaml")
 info = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
-idx = 0
 
-def save_images(response, name: str, out_dir: Path) -> list[Path]:
+def save_images(response, name: str, out_dir: Path, prompt_idx) -> list[Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     saved = []
     
@@ -23,10 +22,9 @@ def save_images(response, name: str, out_dir: Path) -> list[Path]:
         for part in parts or []:
             if getattr(part, "inline_data", None):
                 img = part.as_image()
-                out_path = out_dir / f"{name}_tgt{idx:02d}.png"  # 저장할 생성 이미지 이름
+                out_path = out_dir / f"{name}_tgt{prompt_idx:02d}.png"  # 저장할 생성 이미지 이름
                 img.save(out_path)
                 saved.append(out_path)
-                idx += 1
 
 
     handle_parts(getattr(response, "parts", None))
@@ -53,7 +51,7 @@ def call_gpt(mykey: str, user_prompt: str) -> str:
     )
     return response.output_text
 
-def call_gemini(mykey, ref_img, prompt):
+def call_gemini(mykey, ref_img, prompt, prompt_idx):
     client = genai.Client(api_key=mykey)
 
     # 이미지 파일을 바이트로 읽어 Part로 감싸기
@@ -80,7 +78,7 @@ def call_gemini(mykey, ref_img, prompt):
 
     out_dir = Path(info["output"]["output_dir"])
     img_file_name = Path(ref_img).stem
-    saved = save_images(response, img_file_name, out_dir) # out_dir / img_file_name
+    saved = save_images(response, img_file_name, out_dir, prompt_idx) # out_dir / img_file_name
     return saved
 
 def main():
@@ -91,10 +89,11 @@ def main():
     user_prompt = df["prompt"].tolist() # 사용자 프롬프트.
     # 레퍼런스 리스트 파일 불러오기
     input_ref = df["ref_path"].tolist() # 여기에 넣을 reference 이미지 경로
-    numbers = random.sample(range(0,len(user_prompt)), 10)  # prompt index 랜덤으로 10개 뽑기
     gen_img_info = []
-    print(numbers)
+    
     for input_img in input_ref:
+        numbers = random.sample(range(0,len(user_prompt)), 10)  # prompt index 랜덤으로 10개 뽑기
+        print(numbers)
         for i in numbers:
             # 프롬프트 생성(gemini에 넣을 프롬프트 생성)
             gen_prompt = call_gpt(gpt_key, user_prompt[i])
@@ -106,7 +105,7 @@ def main():
 
             # 제미나이 이미지 생성
             gemini_key = info["gemini"]["key"]
-            saved_img = call_gemini(gemini_key, input_img, gen_prompt)
+            saved_img = call_gemini(gemini_key, input_img, gen_prompt, i)
 
             print(f'🤖Model: {info["gemini"]["model"]}')
             print(f'📊Output: {Path(info["output"]["output_dir"]).resolve()}')
