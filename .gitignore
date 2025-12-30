@@ -2,3 +2,7 @@ mxfont/data/**
 !mxfont/data/
 !mxfont/data/.gitkeep
 new_api/config.yaml
+seg+crop+pad/no-time-to-train/data.csv
+seg+crop+pad/no-time-to-train/img**
+!seg+crop+pad/no-time-to-train/
+!seg+crop+pad/no-time-to-train/.gitkeep

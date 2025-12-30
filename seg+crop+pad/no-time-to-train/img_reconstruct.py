@@ -44,14 +44,14 @@ def main():
     # =====================================================
     # 메인 처리
     # =====================================================
-    data = pd.read_csv("./data.csv",encoding=',', encoding='utf-8')
+    data = pd.read_csv("./data.csv",sep=',', encoding='utf-8')
 
     save_dir = "./seg_result"
 
     os.makedirs(save_dir, exist_ok=True)
-    for pair in data:
-        ref_image_path = data['ref_path']
-        target_image_path = data['tar_path']
+    for _, pair in data.iterrows():
+        ref_image_path = pair['ref_path']
+        target_image_path = pair['tar_path']
         if not os.path.exists(ref_image_path):
             print(f"❌ Error: Ref image not found at {ref_image_path}")
         elif not os.path.exists(target_image_path):
@@ -66,7 +66,8 @@ def main():
                     target_image_path,
                     save_dir,
                     dinov2_model,
-                    mask_generator
+                    mask_generator,
+                    device
                 )
 
                 print("\n" + "="*70)

@@ -118,6 +118,7 @@ def get_bounding_box(mask):
 
 def crop_by_mask(image, mask, padding=10):
     """마스크 영역을 bounding box로 크롭 (패딩 추가)"""
+    print("cropping by mask")
     bbox = get_bounding_box(mask)
     if bbox is None:
         return None
@@ -130,6 +131,7 @@ def crop_by_mask(image, mask, padding=10):
     rmax = min(h, rmax + padding)
     cmin = max(0, cmin - padding)
     cmax = min(w, cmax + padding)
+    print(rmin, rmax, cmin, cmax)
 
     # 크롭
     cropped = image[rmin:rmax+1, cmin:cmax+1]
@@ -138,18 +140,16 @@ def crop_by_mask(image, mask, padding=10):
     return cropped, cropped_mask, rmin, rmax, cmin, cmax
 
 def final_img_padding(img, pad_tb, pad_lr):
-    # pad: int 하나(사방 동일) 또는 (top, bottom, left, right) 튜플
     top = bottom = pad_tb
     left = right = pad_lr
 
     if img.ndim == 2:  # 흑백
         pad_width = ((top, bottom), (left, right))
-        value = 255
     else:              # RGB
         pad_width = ((top, bottom), (left, right), (0, 0))
-        value = (255, 255, 255)
 
-    return np.pad(img, pad_width, mode="constant", constant_values=value).astype(np.uint8)
+        white = ((255, 255), (255, 255), (255, 255))  # (ndim, 2) 형태
+    return np.pad(img, pad_width, mode="constant", constant_values=white).astype(np.uint8)
 
 def process_single_pair(ref_path, target_path, save_folder, dinov2_model, mask_generator, device):
     """
@@ -179,12 +179,12 @@ def process_single_pair(ref_path, target_path, save_folder, dinov2_model, mask_g
         if 0.02 < mask_area < 0.85: # 유효한 mask
             # Bounding box로 크롭
             crop_result = crop_by_mask(target_img, mask, padding=10)
-
+            cropped_img = cropped_mask = bbox_rmin = bbox_rmax = bbox_cmin = bbox_cmax = None
             if crop_result is not None:
                 cropped_img, cropped_mask, bbox_rmin, bbox_rmax, bbox_cmin, bbox_cmax = crop_result
 
                 # 크롭된 이미지의 특징 추출
-                crop_patches, crop_cls = extract_dinov2_patch_features(cropped_img, dinov2_model)
+                crop_patches, crop_cls = extract_dinov2_patch_features(cropped_img, dinov2_model, device)
 
                 # 크롭된 마스크를 37x37로 리사이즈
                 cropped_mask_resized = cv2.resize(
@@ -200,6 +200,7 @@ def process_single_pair(ref_path, target_path, save_folder, dinov2_model, mask_g
                     cropped_mask_resized
                 )
 
+                if (bbox_rmin is None) or (bbox_rmax is None) or (bbox_cmax is None) or (bbox_cmin is None): continue
                 mask_similarities.append({
                     'idx': idx,
                     'similarity': combined_sim,
@@ -213,6 +214,8 @@ def process_single_pair(ref_path, target_path, save_folder, dinov2_model, mask_g
                     'cmax' : bbox_cmax
                 })
             else:
+                continue
+                #if (bbox_rmin is None) or (bbox_rmax is None) or (bbox_cmax is None) or (bbox_cmin is None): continue
                 mask_similarities.append({
                     'idx': idx,
                     'similarity': -1.0,
@@ -226,6 +229,8 @@ def process_single_pair(ref_path, target_path, save_folder, dinov2_model, mask_g
                     'cmax' : bbox_cmax
                 })
         else:
+            #if (bbox_rmin is None) or (bbox_rmax is None) or (bbox_cmax is None) or (bbox_cmin is None): continue
+            continue
             mask_similarities.append({
                 'idx': idx,
                 'similarity': -1.0,
@@ -246,6 +251,13 @@ def process_single_pair(ref_path, target_path, save_folder, dinov2_model, mask_g
         # 유효한 마스크가 없으면 첫 번째 마스크 사용
         best_mask_info = mask_similarities[0]
         print(f"  ⚠️ No valid masks, using first mask")
+        print(f"  ⚠️ We can't save sagmenated image")
+        return {
+            'output_filename': None,
+            'similarity': None,
+            'cls_similarity': None,
+            'patch_similarity': None
+        }
     else:
         best_mask_info = max(valid_masks, key=lambda x: x['similarity'])
         print(f"  ✅ Best mask: #{best_mask_info['idx']} | " +
