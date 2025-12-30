@@ -118,7 +118,6 @@ def get_bounding_box(mask):
 
 def crop_by_mask(image, mask, padding=10):
     """마스크 영역을 bounding box로 크롭 (패딩 추가)"""
-    print("cropping by mask")
     bbox = get_bounding_box(mask)
     if bbox is None:
         return None
@@ -282,7 +281,7 @@ def process_single_pair(ref_path, target_path, save_folder, dinov2_model, mask_g
     diag = math.ceil(diag)+10
     r_pad = diag-r_length # top, bottom
     c_pad = diag-c_length # left, right
-    white_bg_image_pad = final_img_padding(white_bg_image, r_pad, c_pad)
+    white_bg_image_pad = final_img_padding(white_bg_image, r_pad//2, c_pad//2)
 
     # 파일명 생성 및 저장
     base_name = os.path.splitext(os.path.basename(target_path))[0]
