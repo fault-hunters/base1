@@ -91,3 +91,6 @@ threshold_s: 0.8
 threshold_c: 0.8
 #epoch
 epoch: 1000
+#alpha
+alpha_s: 10.0
+alpha_c: 10.0

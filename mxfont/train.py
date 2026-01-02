@@ -51,8 +51,7 @@ def train(args, cfg):
     cfg.tb_freq = -1
 
     trn_transform = transforms.Compose([
-        transforms.RandomApply([transforms.RandomRotation(cfg.dset_aug.rotation_deg, fill=0)], p=cfg.dset_aug.rotation_p),
-        transforms.Resize((128,128)),
+        transforms.Resize((1024, 1024)), # input img resizing 1024X1024
         transforms.ToTensor(),
         transforms.Normalize([0.5]*3, [0.5]*3) if cfg.dset_aug.normalize else lambda x: x,
     ])
@@ -72,8 +71,8 @@ def train(args, cfg):
 
     trainer = PairTrainer(
         gen, optim_g, logger, device=device,
-        w_style=cfg.get("w_style", 1.0),
-        w_content=cfg.get("w_content", 1.0),
+        w_style=cfg.get("w_style", 0.5),
+        w_content=cfg.get("w_content", 0.5),
         threshold_s=cfg.threshold_s,
         threshold_c=cfg.threshold_c,
     )

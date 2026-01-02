@@ -16,7 +16,7 @@ def build_transform(cfg):
     if rotation_deg is not None and rotation_p and rotation_p > 0:
         ts.append(transforms.RandomApply([transforms.RandomRotation(rotation_deg, fill=0)], p=rotation_p))
     ts.extend([
-        transforms.Resize((128, 128)),
+        transforms.Resize((1024, 1024)), # input img resizing 1024X1024
         transforms.ToTensor(),
         transforms.Normalize([0.5] * 3, [0.5] * 3) if cfg.dset_aug.normalize else lambda x: x,
     ])
