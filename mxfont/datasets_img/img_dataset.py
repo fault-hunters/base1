@@ -15,9 +15,9 @@ class ImagePairCSVDataset(Dataset):
         with open(self.csv_path, newline='', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                imgA = row["imgA"]
-                imgB = row["imgB"]
-                label_s = int(row["label_s"])   # same=1 / diff=0
+                imgA = row["ref_img"]
+                imgB = row["tar_img"]
+                label_s = int(row["label_s"])   # same=0 / diff=1
                 label_c = int(row["label_c"])
                 self.samples.append((imgA, imgB, label_s, label_c))
 

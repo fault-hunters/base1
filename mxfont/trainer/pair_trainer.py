@@ -64,8 +64,8 @@ class PairTrainer:
         label_c = label_c.to(self.device).view(-1)
 
         sim_s, sim_c = self.forward_pair(imgA, imgB)
-        loss_s = F.binary_cross_entropy(sim_s, label_s)
-        loss_c = F.binary_cross_entropy(sim_c, label_c)
+        loss_s = F.binary_cross_entropy_with_logits(sim_s, label_s.float())
+        loss_c = F.binary_cross_entropy_with_logits(sim_c, label_c.float())
         loss = self.w_style * loss_s + self.w_content * loss_c
         pred_s = (sim_s >= self.threshold_s).float()
         pred_c = (sim_c >= self.threshold_c).float()
