@@ -49,6 +49,9 @@ def main():
     save_dir = "./seg_result"
 
     os.makedirs(save_dir, exist_ok=True)
+
+    df = []
+
     for _, pair in data.iterrows():
         ref_image_path = pair['ref_path']
         target_image_path = pair['tar_path']
@@ -82,18 +85,19 @@ def main():
                 print(f"  - Patch Similarity:  {result['patch_similarity']:.4f}")
 
                 # CSV 저장
-                df = pd.DataFrame([result])
-                csv_path = os.path.join(save_dir, "similarity_scores.csv")
-                df.to_csv(csv_path, index=False)
-
-                print(f"\n💾 Results saved:")
-                print(f"  - Segmented Image: {os.path.join(save_dir, result['output_filename'])}")
-                print(f"  - CSV File:        {csv_path}")
+                df.append(result)
+                print(f"🖼️Segmented Image: {os.path.join(save_dir, result['output_filename'])}")
+                
 
             except Exception as e:
                 print(f"\n❌ Error during processing: {str(e)}")
                 import traceback
                 traceback.print_exc()
-
+    
+    df = pd.DataFrame(df)
+    csv_path = os.path.join(save_dir, "similarity_scores.csv")
+    df.to_csv(csv_path, index=False)
+    print(f"💾 Results saved:")
+    print(f"  - CSV File:        {csv_path}")
 if __name__ == "__main__":
     main()
