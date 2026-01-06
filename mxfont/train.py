@@ -85,6 +85,9 @@ def train(args, cfg):
             loss, loss_s, loss_c, acc, sim_s, sim_c, acc_s, acc_c = trainer.train_one_batch(
                 (imgA, imgB, label_s, label_c)
             )
+            if global_step >= cfg.max_iter:
+                return
+            global_step += 1
 
         #if global_step % img_freq == 0:
         if epoch % img_freq == 0:
@@ -96,9 +99,7 @@ def train(args, cfg):
                 f"| acc_s {acc_s*100:.2f}% | acc_c {acc_c*100:.2f}% "
                 f"| sim_s {sim_s.mean().item():.3f} | sim_c {sim_c.mean().item():.3f}"
             )
-            if global_step >= cfg.max_iter:
-                return
-            global_step += 1
+
         #if (global_step % cfg.val_freq == 0) and (global_step > 0):
         if (epoch % cfg.val_freq == 0) and epoch>0:
             gen.eval()
@@ -130,7 +131,7 @@ def train(args, cfg):
         if (epoch % cfg.save_freq == 0) or (epoch >= cfg.max_iter):
             torch.save(
                 {"gen": gen.state_dict(), "optim_g": optim_g.state_dict(), "step": global_step, "cfg": cfg},
-                cfg.work_dir / f"gen_{global_step}.pth"
+                cfg.work_dir / f"gen_{epoch}.pth"
             )
 
         

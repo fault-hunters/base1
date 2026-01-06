@@ -44,8 +44,8 @@ class PairTrainer:
         self.optim.step()
 
         with torch.no_grad():
-            pred_s = (sim_s <= self.threshold_s).float()
-            pred_c = (sim_c <= self.threshold_c).float()
+            pred_s = 1.0 - (sim_s >= self.threshold_s).float()
+            pred_c = 1.0 - (sim_c >= self.threshold_c).float()
             acc_s = (pred_s == label_s).float().mean()
             acc_c = (pred_c == label_c).float().mean()
             acc = 0.5 * (acc_s + acc_c)
