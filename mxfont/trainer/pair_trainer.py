@@ -19,9 +19,12 @@ class PairTrainer:
         sB, cB = self.gen.extract_style_content(imgB)
         sim_s = F.cosine_similarity(sA, sB, dim=1).clamp(-1, 1)
         sim_c = F.cosine_similarity(cA, cB, dim=1).clamp(-1, 1)
-        logit_s = -self.alpha_s * sim_s
-        logit_c = -self.alpha_c * sim_c
-        return logit_s, logit_c
+        #logit_s = -self.alpha_s * sim_s
+        #logit_c = -self.alpha_c * sim_c
+        #return logit_s, logit_c
+        sim_s = (sim_s + 1) / 2 # 0~1범위로 스케일링
+        sim_c = (sim_c + 1) / 2 # 0~1범위로 스케일링
+        return sim_s, sim_c
 
     def train_one_batch(self, batch):
         imgA, imgB, label_s, label_c = batch
@@ -30,8 +33,10 @@ class PairTrainer:
         label_c = label_c.to(self.device).view(-1)
 
         sim_s, sim_c = self.forward_pair(imgA, imgB)
-        loss_s = F.binary_cross_entropy_with_logits(sim_s, label_s.float())
-        loss_c = F.binary_cross_entropy_with_logits(sim_c, label_c.float())
+        #loss_s = F.binary_cross_entropy_with_logits(sim_s, label_s.float())
+        #loss_c = F.binary_cross_entropy_with_logits(sim_c, label_c.float())
+        loss_s = F.binary_cross_entropy(sim_s, label_s)
+        loss_c = F.binary_cross_entropy(sim_c, label_c)
         loss = self.w_style * loss_s + self.w_content * loss_c
 
         self.optim.zero_grad()
@@ -39,8 +44,8 @@ class PairTrainer:
         self.optim.step()
 
         with torch.no_grad():
-            pred_s = (sim_s >= self.threshold_s).float()
-            pred_c = (sim_c >= self.threshold_c).float()
+            pred_s = (sim_s <= self.threshold_s).float()
+            pred_c = (sim_c <= self.threshold_c).float()
             acc_s = (pred_s == label_s).float().mean()
             acc_c = (pred_c == label_c).float().mean()
             acc = 0.5 * (acc_s + acc_c)
