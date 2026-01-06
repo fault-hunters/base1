@@ -86,52 +86,55 @@ def train(args, cfg):
                 (imgA, imgB, label_s, label_c)
             )
 
-            if global_step % img_freq == 0:
-                grid = make_comparable_grid(imgA[:4].cpu(), imgB[:4].cpu(), nrow=4)
-                writer.add_image("train_pairs", grid, global_step)
-                logger.info(
-                    f"[epoch {epoch+1}] step {global_step} | loss {loss:.4f} "
-                    f"| loss_s {loss_s:.4f} | loss_c {loss_c:.4f} | acc {acc*100:.2f}% "
-                    f"| acc_s {acc_s*100:.2f}% | acc_c {acc_c*100:.2f}% "
-                    f"| sim_s {sim_s.mean().item():.3f} | sim_c {sim_c.mean().item():.3f}"
-                )
-
-            if (global_step % cfg.val_freq == 0) and (global_step > 0):
-                gen.eval()
-                total_loss = total_loss_s = total_loss_c = total_s = total_c = total = 0
-                with torch.no_grad():
-                    for vbatch in val_loader:
-                        loss_v, loss_s_v, loss_c_v, acc_v, acc_s_v, acc_c_v, bs = trainer.eval_one_batch(vbatch)
-                        total_loss += loss_v * bs
-                        total_loss_s += loss_s_v * bs
-                        total_loss_c += loss_c_v * bs
-                        total_s += acc_s_v * bs
-                        total_c += acc_c_v * bs
-                        total += bs
-                    mean_loss = total_loss / total
-                    mean_loss_s = total_loss_s / total
-                    mean_loss_c = total_loss_c / total
-                    mean_acc_s = total_s / total
-                    mean_acc_c = total_c / total
-                    mean_acc = 0.5 * (mean_acc_s + mean_acc_c)
-                    logger.info(
-                        f"[val] step {global_step} | loss {mean_loss:.4f} "
-                        f"| loss_s {mean_loss_s:.4f} | loss_c {mean_loss_c:.4f} "
-                        f"| acc {mean_acc*100:.2f}% "
-                        f"| acc_s {mean_acc_s*100:.2f}% | acc_c {mean_acc_c*100:.2f}%"
-                    )
-                gen.train()
-
-            if (global_step % cfg.save_freq == 0) or (global_step >= cfg.max_iter):
-                torch.save(
-                    {"gen": gen.state_dict(), "optim_g": optim_g.state_dict(), "step": global_step, "cfg": cfg},
-                    cfg.work_dir / f"gen_{global_step}.pth"
-                )
-
-            
+        #if global_step % img_freq == 0:
+        if epoch % img_freq == 0:
+            grid = make_comparable_grid(imgA[:4].cpu(), imgB[:4].cpu(), nrow=4)
+            writer.add_image("train_pairs", grid, global_step)
+            logger.info(
+                f"[epoch {epoch+1}] step {global_step} | loss {loss:.4f} "
+                f"| loss_s {loss_s:.4f} | loss_c {loss_c:.4f} | acc {acc*100:.2f}% "
+                f"| acc_s {acc_s*100:.2f}% | acc_c {acc_c*100:.2f}% "
+                f"| sim_s {sim_s.mean().item():.3f} | sim_c {sim_c.mean().item():.3f}"
+            )
             if global_step >= cfg.max_iter:
                 return
             global_step += 1
+        #if (global_step % cfg.val_freq == 0) and (global_step > 0):
+        if (epoch % cfg.val_freq == 0) and epoch>0:
+            gen.eval()
+            total_loss = total_loss_s = total_loss_c = total_s = total_c = total = 0
+            with torch.no_grad():
+                for vbatch in val_loader:
+                    loss_v, loss_s_v, loss_c_v, acc_v, acc_s_v, acc_c_v, bs = trainer.eval_one_batch(vbatch)
+                    total_loss += loss_v * bs
+                    total_loss_s += loss_s_v * bs
+                    total_loss_c += loss_c_v * bs
+                    total_s += acc_s_v * bs
+                    total_c += acc_c_v * bs
+                    total += bs
+                mean_loss = total_loss / total
+                mean_loss_s = total_loss_s / total
+                mean_loss_c = total_loss_c / total
+                mean_acc_s = total_s / total
+                mean_acc_c = total_c / total
+                mean_acc = 0.5 * (mean_acc_s + mean_acc_c)
+                logger.info(
+                    f"[val] step {global_step} | loss {mean_loss:.4f} "
+                    f"| loss_s {mean_loss_s:.4f} | loss_c {mean_loss_c:.4f} "
+                    f"| acc {mean_acc*100:.2f}% "
+                    f"| acc_s {mean_acc_s*100:.2f}% | acc_c {mean_acc_c*100:.2f}%"
+                )
+            gen.train()
+
+        #if (global_step % cfg.save_freq == 0) or (global_step >= cfg.max_iter):
+        if (epoch % cfg.save_freq == 0) or (epoch >= cfg.max_iter):
+            torch.save(
+                {"gen": gen.state_dict(), "optim_g": optim_g.state_dict(), "step": global_step, "cfg": cfg},
+                cfg.work_dir / f"gen_{global_step}.pth"
+            )
+
+        
+
 
 def parse_cfg():
     parser = argparse.ArgumentParser()
