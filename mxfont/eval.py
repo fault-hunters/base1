@@ -8,6 +8,7 @@ from sconf import Config
 from models.generator2 import Generator
 from datasets_img import get_img_loader
 import utils
+import pandas as pd
 
 def build_transform(cfg):
     ts = []
@@ -16,7 +17,7 @@ def build_transform(cfg):
     if rotation_deg is not None and rotation_p and rotation_p > 0:
         ts.append(transforms.RandomApply([transforms.RandomRotation(rotation_deg, fill=0)], p=rotation_p))
     ts.extend([
-        transforms.Resize((1024, 1024)), # input img resizing 1024X1024
+        transforms.Resize((1024, 1024)), # input img resizing 512X512
         transforms.ToTensor(),
         transforms.Normalize([0.5] * 3, [0.5] * 3) if cfg.dset_aug.normalize else lambda x: x,
     ])
@@ -54,6 +55,7 @@ def evaluate(gen, loader, device, threshold_s, threshold_c, vis_dir: Path = None
     tp_s = fp_s = fn_s = tn_s = 0
     tp_c = fp_c = fn_c = tn_c = 0
     saved = 0
+    sim_info = []
     for imgA, imgB, label_s, label_c in loader:
         imgA = imgA.to(device); imgB = imgB.to(device)
         label_s = label_s.to(device).view(-1)
@@ -65,6 +67,7 @@ def evaluate(gen, loader, device, threshold_s, threshold_c, vis_dir: Path = None
         sim_c = torch.nn.functional.cosine_similarity(cA, cB, dim=1).clamp(-1, 1)
         sim_s = (sim_s + 1) / 2
         sim_c = (sim_c + 1) / 2
+        sim_info.append({'sim_s': sim_s, 'sim_c': sim_c})
 
         pred_s = (sim_s >= threshold_s).float()
         pred_c = (sim_c >= threshold_c).float()
@@ -128,7 +131,7 @@ def evaluate(gen, loader, device, threshold_s, threshold_c, vis_dir: Path = None
         "style": {"f1": f1_s, "precision": prec_s, "recall": rec_s, "cm": cm_s},
         "content": {"f1": f1_c, "precision": prec_c, "recall": rec_c, "cm": cm_c},
     }
-    return mean_acc, mean_acc_s, mean_acc_c, metrics
+    return mean_acc, mean_acc_s, mean_acc_c, metrics, sim_info
 
 def load_gen(cfg, weight_path, device):
     gen = Generator(3, cfg.C, 1, **cfg.get("g_args", {})).to(device)
@@ -171,7 +174,7 @@ def main():
     )
 
     gen = load_gen(cfg, args.weight, device)
-    acc, acc_s, acc_c, metrics = evaluate(
+    acc, acc_s, acc_c, metrics, sim_info = evaluate(
         gen,
         val_loader,
         device,
@@ -181,6 +184,12 @@ def main():
         vis_n=args.vis_n,
         normalize=bool(cfg.dset_aug.normalize),
     )
+    
+    sim_df = pd.DataFrame(sim_info)
+    csv_path = getattr(test_cfg, "work_dir", test_cfg)
+    csv_path = Path(csv_path) / 'similarity_eval.csv'
+    sim_df.to_csv(csv_path, index=False, sep=',', encoding='utf-8')
+
     print(f"[test] acc {acc*100:.2f}% | acc_s {acc_s*100:.2f}% | acc_c {acc_c*100:.2f}% "
           f"| macro_f1 {metrics['macro_f1']:.3f} | f1_s {metrics['style']['f1']:.3f} | f1_c {metrics['content']['f1']:.3f}")
     print(f"style cm [[tn, fp], [fn, tp]] = {metrics['style']['cm']} | precision = {metrics['style']['precision']} | recall = {metrics['style']['recall']}")
