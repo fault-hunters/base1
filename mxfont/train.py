@@ -11,20 +11,31 @@ import numpy as np
 from utils.visualize import make_comparable_grid
 from pathlib import Path
 import argparse
+import os
+import torch
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 from sconf import Config
 
 # setup_args_and_config: 동일 구조, work_dir 준비, n_workers 조정
 # setup_transforms: Resize -> ToTensor (+ Normalize)
 
 def train(args, cfg):
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    if cfg.use_ddp:
+        dist.init_process_group(backend="nccl", init_method="env://")
+
+        local_rank = int(os.environ["LOCAL_RANK"])
+        torch.cuda.set_device(local_rank)
+        device = torch.device(f"cuda:{local_rank}")
+    else:
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     gen = Generator(3, cfg.C, 1, **cfg.get("g_args", {})).to(device)
 
-    
+    '''
     for m in [gen.style_enc, gen.experts_s, gen.fuser_style, gen.fact_blocks_s]:
         for p in m.parameters():
             p.requires_grad = False
-    
+    '''
 
     optim_g = optim.Adam(gen.parameters(), lr=cfg.g_lr, betas=cfg.adam_betas)
     
@@ -51,7 +62,7 @@ def train(args, cfg):
     cfg.tb_freq = -1
 
     trn_transform = transforms.Compose([
-        transforms.Resize((1024, 1024)), # input img resizing 1024X1024
+        transforms.Resize((1024, 1024)), # input img resizing 512X512
         transforms.ToTensor(),
         transforms.Normalize([0.5]*3, [0.5]*3) if cfg.dset_aug.normalize else lambda x: x,
     ])
@@ -70,7 +81,7 @@ def train(args, cfg):
     )
 
     trainer = PairTrainer(
-        gen, optim_g, logger, device=device,
+        gen, optim_g, cfg, logger, device=device,
         w_style=cfg.get("w_style", 0.5),
         w_content=cfg.get("w_content", 0.5),
         threshold_s=cfg.threshold_s,
@@ -80,11 +91,26 @@ def train(args, cfg):
     img_freq = getattr(cfg, "img_freq", 1000)
 
     for epoch in range(cfg.epoch):
+        train_acc_s = train_acc_c = train_loss = train_loss_s = train_loss_c = train_total = 0
         for batch in trn_loader:
             imgA, imgB, label_s, label_c = batch  # 샘플 저장용으로 언팩
-            loss, loss_s, loss_c, acc, sim_s, sim_c, acc_s, acc_c = trainer.train_one_batch(
+            loss, loss_s, loss_c, acc, sim_s, sim_c, acc_s, acc_c, bs = trainer.train_one_batch(
                 (imgA, imgB, label_s, label_c)
             )
+
+            train_acc_s += acc_s * bs
+            train_acc_c += acc_c * bs
+            train_loss += loss * bs
+            train_loss_s += loss_s * bs
+            train_loss_c += loss_c * bs
+            train_total += bs
+            mean_loss = train_loss / train_total
+            mean_loss_s = train_loss_s / train_total
+            mean_loss_c = train_loss_c / train_total
+            mean_acc_s = train_acc_s / train_total
+            mean_acc_c = train_acc_c / train_total
+            mean_acc = 0.5 * (mean_acc_s + mean_acc_c)
+
             if global_step >= cfg.max_iter:
                 return
             global_step += 1
@@ -94,10 +120,9 @@ def train(args, cfg):
             grid = make_comparable_grid(imgA[:4].cpu(), imgB[:4].cpu(), nrow=4)
             writer.add_image("train_pairs", grid, global_step)
             logger.info(
-                f"[epoch {epoch+1}] step {global_step} | loss {loss:.4f} "
-                f"| loss_s {loss_s:.4f} | loss_c {loss_c:.4f} | acc {acc*100:.2f}% "
-                f"| acc_s {acc_s*100:.2f}% | acc_c {acc_c*100:.2f}% "
-                f"| sim_s {sim_s.mean().item():.3f} | sim_c {sim_c.mean().item():.3f}"
+                f"[epoch {epoch}] loss {mean_loss:.4f} "
+                f"| loss_s {mean_loss_s:.4f} | loss_c {mean_loss_c:.4f} | acc {mean_acc*100:.2f}% "
+                f"| acc_s {mean_acc_s*100:.2f}% | acc_c {mean_acc_c*100:.2f}% "
             )
 
         #if (global_step % cfg.val_freq == 0) and (global_step > 0):
@@ -120,7 +145,7 @@ def train(args, cfg):
                 mean_acc_c = total_c / total
                 mean_acc = 0.5 * (mean_acc_s + mean_acc_c)
                 logger.info(
-                    f"[val] step {global_step} | loss {mean_loss:.4f} "
+                    f"[val] epoch {epoch} | loss {mean_loss:.4f} "
                     f"| loss_s {mean_loss_s:.4f} | loss_c {mean_loss_c:.4f} "
                     f"| acc {mean_acc*100:.2f}% "
                     f"| acc_s {mean_acc_s*100:.2f}% | acc_c {mean_acc_c*100:.2f}%"

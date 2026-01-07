@@ -2,11 +2,12 @@ import torch
 import torch.nn.functional as F
 
 class PairTrainer:
-    def __init__(self, gen, optim, logger, device="cuda", w_style=1.0, w_content=1.0, threshold_s = 0.8, threshold_c = 0.8, alpha_s = 10.0, alpha_c = 10.0):
+    def __init__(self, gen, optim, cfg, logger, device="cuda", w_style=1.0, w_content=1.0, threshold_s = 0.8, threshold_c = 0.8, alpha_s = 10.0, alpha_c = 10.0):
         self.gen = gen.to(device).train()
         self.optim = optim
         self.logger = logger
         self.device = device
+        self.cfg = cfg
         self.w_style = w_style
         self.w_content = w_content
         self.threshold_s = threshold_s
@@ -29,14 +30,14 @@ class PairTrainer:
     def train_one_batch(self, batch):
         imgA, imgB, label_s, label_c = batch
         imgA, imgB = imgA.to(self.device), imgB.to(self.device)
-        label_s = label_s.to(self.device).view(-1)
-        label_c = label_c.to(self.device).view(-1)
+        label_s = label_s.to(self.device).view(-1).float()
+        label_c = label_c.to(self.device).view(-1).float()
 
         sim_s, sim_c = self.forward_pair(imgA, imgB)
         #loss_s = F.binary_cross_entropy_with_logits(sim_s, label_s.float())
         #loss_c = F.binary_cross_entropy_with_logits(sim_c, label_c.float())
-        loss_s = F.binary_cross_entropy(sim_s, label_s)
-        loss_c = F.binary_cross_entropy(sim_c, label_c)
+        loss_s = F.binary_cross_entropy(sim_s, 1.0 - label_s)
+        loss_c = F.binary_cross_entropy(sim_c, 1.0 - label_c)
         loss = self.w_style * loss_s + self.w_content * loss_c
 
         self.optim.zero_grad()
@@ -49,6 +50,7 @@ class PairTrainer:
             acc_s = (pred_s == label_s).float().mean()
             acc_c = (pred_c == label_c).float().mean()
             acc = 0.5 * (acc_s + acc_c)
+            bs = label_s.size(0)
 
         return (
             loss.item(),
@@ -59,20 +61,21 @@ class PairTrainer:
             sim_c.detach(),
             acc_s.item(),
             acc_c.item(),
+            bs
         )
 
     @torch.no_grad()
     def eval_one_batch(self, batch):
         imgA, imgB, label_s, label_c = batch
         imgA, imgB = imgA.to(self.device), imgB.to(self.device)
-        label_s = label_s.to(self.device).view(-1)
-        label_c = label_c.to(self.device).view(-1)
+        label_s = label_s.to(self.device).view(-1).float()
+        label_c = label_c.to(self.device).view(-1).float()
 
         sim_s, sim_c = self.forward_pair(imgA, imgB)
         #loss_s = F.binary_cross_entropy_with_logits(sim_s, label_s.float())
         #loss_c = F.binary_cross_entropy_with_logits(sim_c, label_c.float())
-        loss_s = F.binary_cross_entropy(sim_s, label_s)
-        loss_c = F.binary_cross_entropy(sim_c, label_c)
+        loss_s = F.binary_cross_entropy(sim_s, 1.0 - label_s)
+        loss_c = F.binary_cross_entropy(sim_c, 1.0 - label_c)
         loss = self.w_style * loss_s + self.w_content * loss_c
         #pred_s = (sim_s >= self.threshold_s).float()
         #pred_c = (sim_c >= self.threshold_c).float()

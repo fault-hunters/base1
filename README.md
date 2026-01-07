@@ -5,9 +5,32 @@
     - style feature map
     - content feature map
 - train
-    ```
-    python train.py cfgs/train.yaml
-    ```
+    - 단일 gpu
+        ```
+        python train.py cfgs/train.yaml
+        ```
+        - train.yaml에서 use_ddp = False
+    - 멀티 gpu
+        ```
+        torchrun --nproc_per_node=N train.py cfgs/train.yaml
+        ```
+        - train.yaml에서 use_ddp = True
+        - N은 사용할 gpu개수
+        - 터미널에서 gpu 현황 확인하고 사용하기
+            ```
+            nvidia-smi # 한번만 보기
+            watch -n 1 nvidia-smi # 실시간으로 1초마다 자동 출력
+            ```
+        - N수 정할때는 사용가능한 gpu개수 확인
+            ```
+            # python
+            import torch
+
+            print("CUDA available:", torch.cuda.is_available()) # gpu사용가능 여부
+            print("GPU count:", torch.cuda.device_count()) # 보이는 gpu개수
+            ```
+
+
 - test
     ```
     python eval.py cfgs/eval.yaml --weight path/to/gen_xxx.pth --vis_n 100
