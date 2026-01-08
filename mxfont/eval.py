@@ -65,8 +65,8 @@ def evaluate(gen, loader, device, threshold_s, threshold_c, vis_dir: Path = None
         sim_c = (sim_c + 1) / 2
         sim_info.append({'sim_s': sim_s, 'sim_c': sim_c, 'label_s': label_s, 'label_c': label_c})
 
-        pred_s = (sim_s >= threshold_s).float()
-        pred_c = (sim_c >= threshold_c).float()
+        pred_s = 1.00 - (sim_s >= threshold_s).float()
+        pred_c = 1.00 - (sim_c >= threshold_c).float()
         acc_s = (pred_s == label_s).float().mean()
         acc_c = (pred_c == label_c).float().mean()
         total_s += acc_s * bs
@@ -137,6 +137,8 @@ def load_gen(cfg, weight_path, device):
         state = state["state_dict"]
     elif isinstance(state, dict) and "gen" in state:
         state = state["gen"]
+    if any(k.startswith("module.") for k in state.keys()):
+        state = {k.replace("module.", "", 1): v for k, v in state.items()}
     gen.load_state_dict(state)
     return gen
 
@@ -149,7 +151,7 @@ def main():
     parser.add_argument("--vis_n", type=int, default=0, help="저장할 샘플 개수(0이면 저장 안 함)")
     args, left_argv = parser.parse_known_args()
 
-    cfg = Config(*args.config_paths, default="cfgs/defaults.yaml")
+    cfg = Config(*args.config_paths, default="base1/mxfont/cfgs/defaults.yaml")
     cfg.argv_update(left_argv)
     
     if args.csv:
@@ -163,7 +165,7 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     transform = build_transform(cfg)
     _, val_loader = get_img_loader(
-        csv_path, transform,
+        csv_path, cfg.use_ddp, transform,
         batch_size=cfg.batch_size,
         num_workers=cfg.n_workers,
         shuffle=False,
@@ -182,8 +184,10 @@ def main():
     )
     
     sim_df = pd.DataFrame(sim_info)
-    csv_path = getattr(test_cfg, "work_dir", test_cfg)
-    csv_path = Path(csv_path) / 'similarity_eval.csv'
+    work_dir = getattr(test_cfg, "work_dir", None)
+    if not work_dir:
+        work_dir = cfg.work_dir
+    csv_path = Path(work_dir) / "similarity_eval.csv"
     sim_df.to_csv(csv_path, index=False, sep=',', encoding='utf-8')
 
     print(f"[test] acc {acc*100:.2f}% | acc_s {acc_s*100:.2f}% | acc_c {acc_c*100:.2f}% "

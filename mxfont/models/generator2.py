@@ -37,7 +37,7 @@ class Generator(nn.Module):
             C_in, C, **style_enc)
         self.experts_s = exp_builder(C, **experts)
 
-        self.contnet_enc = style_enc_builder(
+        self.content_enc = style_enc_builder(
             C_in, C, **style_enc)
         self.experts_c = exp_builder(C, **experts)
 
@@ -74,7 +74,7 @@ class Generator(nn.Module):
         return feats
     
     def content_encode(self, img):
-        feats = self.contnet_enc(img)
+        feats = self.content_enc(img)
         feats = self.experts_c(feats)
 
         return feats
@@ -134,8 +134,4 @@ class Generator(nn.Module):
 
         style_vec   = self.feat_to_vec(style_feat)     # [B,C]
         content_vec = self.feat_to_vec(content_feat)   # [B,C]
-        
-        #label 1개짜리로 갈때 
-        #total_vec = torch.cat([style_vec, content_vec], dim=1)
-        #return total_vec
         return style_vec, content_vec

@@ -49,11 +49,12 @@ def train(args, cfg, ddp_gpu):
     if cfg.use_ddp:
         gen = DDP(gen, device_ids=[ddp_gpu], output_device=ddp_gpu)
 
-    '''
-    for m in [gen.style_enc, gen.experts_s, gen.fuser_style, gen.fact_blocks_s]:
+    # style 동결
+    g = gen.module if hasattr(gen, "module") else gen
+    for m in [g.style_enc, g.experts_s, g.fuser_style, g.fact_blocks_s]:
         for p in m.parameters():
             p.requires_grad = False
-    '''
+    
 
     optim_g = optim.Adam(gen.parameters(), lr=cfg.g_lr, betas=cfg.adam_betas)
     
