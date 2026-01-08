@@ -16,20 +16,38 @@ import torch
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from sconf import Config
+import torch.multiprocessing as mp
 
 # setup_args_and_config: 동일 구조, work_dir 준비, n_workers 조정
 # setup_transforms: Resize -> ToTensor (+ Normalize)
 
-def train(args, cfg):
-    if cfg.use_ddp:
-        dist.init_process_group(backend="nccl", init_method="env://")
+def cleanup():
+    dist.destroy_process_group()
 
-        local_rank = int(os.environ["LOCAL_RANK"])
-        torch.cuda.set_device(local_rank)
-        device = torch.device(f"cuda:{local_rank}")
+
+def is_main_worker(gpu):
+    return (gpu <= 0)
+
+
+def train_ddp(gpu, args, cfg, world_size):
+    dist.init_process_group(backend="nccl",
+                            init_method="tcp://127.0.0.1:" + str(cfg.port),
+                            world_size=world_size,
+                            rank=gpu,)
+
+    train(args, cfg, ddp_gpu=gpu)
+    cleanup()
+
+def train(args, cfg, ddp_gpu):
+    if cfg.use_ddp:
+        torch.cuda.set_device(ddp_gpu)
+        device = torch.device(f"cuda:{ddp_gpu}")
     else:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     gen = Generator(3, cfg.C, 1, **cfg.get("g_args", {})).to(device)
+
+    if cfg.use_ddp:
+        gen = DDP(gen, device_ids=[ddp_gpu], output_device=ddp_gpu)
 
     '''
     for m in [gen.style_enc, gen.experts_s, gen.fuser_style, gen.fact_blocks_s]:
@@ -67,14 +85,14 @@ def train(args, cfg):
         transforms.Normalize([0.5]*3, [0.5]*3) if cfg.dset_aug.normalize else lambda x: x,
     ])
     trn_dset, trn_loader = get_img_loader(
-        cfg.dset.train.data_dir, trn_transform,
+        cfg.dset.train.data_dir, cfg.use_ddp, trn_transform,
         batch_size=cfg.batch_size,
         num_workers=cfg.n_workers,
         shuffle=True,
     )
 
     val_dset, val_loader = get_img_loader(
-        cfg.dset.val.data_dir, trn_transform,
+        cfg.dset.val.data_dir, cfg.use_ddp, trn_transform,
         batch_size=cfg.batch_size,
         num_workers=cfg.n_workers,
         shuffle=False,
@@ -91,6 +109,8 @@ def train(args, cfg):
     img_freq = getattr(cfg, "img_freq", 1000)
 
     for epoch in range(cfg.epoch):
+        if cfg.use_ddp and hasattr(trn_loader, "sampler"):
+            trn_loader.sampler.set_epoch(epoch)
         train_acc_s = train_acc_c = train_loss = train_loss_s = train_loss_c = train_total = 0
         for batch in trn_loader:
             imgA, imgB, label_s, label_c = batch  # 샘플 저장용으로 언팩
@@ -116,7 +136,7 @@ def train(args, cfg):
             global_step += 1
 
         #if global_step % img_freq == 0:
-        if epoch % img_freq == 0:
+        if epoch % img_freq == 0 and is_main_worker(ddp_gpu):
             grid = make_comparable_grid(imgA[:4].cpu(), imgB[:4].cpu(), nrow=4)
             writer.add_image("train_pairs", grid, global_step)
             logger.info(
@@ -126,7 +146,7 @@ def train(args, cfg):
             )
 
         #if (global_step % cfg.val_freq == 0) and (global_step > 0):
-        if (epoch % cfg.val_freq == 0) and epoch>0:
+        if (epoch % cfg.val_freq == 0) and epoch>0  and is_main_worker(ddp_gpu):
             gen.eval()
             total_loss = total_loss_s = total_loss_c = total_s = total_c = total = 0
             with torch.no_grad():
@@ -161,17 +181,27 @@ def train(args, cfg):
 
         
 
-
 def parse_cfg():
     parser = argparse.ArgumentParser()
     parser.add_argument("config_paths", nargs="+", help="path to config.yaml")
     args, left = parser.parse_known_args()
-    cfg = Config(*args.config_paths, default="cfgs/defaults.yaml")
+    cfg = Config(*args.config_paths, default="base1/mxfont/cfgs/defaults.yaml")
     cfg.argv_update(left)
+
+    if cfg.use_ddp:
+        cfg.n_workers = 0
+    cfg.work_dir = Path(cfg.work_dir)
+    (cfg.work_dir / "checkpoints").mkdir(parents=True, exist_ok=True)
+
     return args, cfg
 
 if __name__ == "__main__":
     args, cfg = parse_cfg()
     np.random.seed(cfg.seed)
     torch.manual_seed(cfg.seed)
-    train(args, cfg)
+    if cfg.use_ddp:
+        ngpus_per_node = torch.cuda.device_count()
+        world_size = ngpus_per_node
+        mp.spawn(train_ddp, nprocs=ngpus_per_node, args=(args, cfg, world_size))
+    else:
+        train(args, cfg)

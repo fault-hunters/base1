@@ -11,11 +11,7 @@
         ```
         - train.yaml에서 use_ddp = False
     - 멀티 gpu
-        ```
-        torchrun --nproc_per_node=N train.py cfgs/train.yaml
-        ```
         - train.yaml에서 use_ddp = True
-        - N은 사용할 gpu개수
         - 터미널에서 gpu 현황 확인하고 사용하기
             ```
             nvidia-smi # 한번만 보기

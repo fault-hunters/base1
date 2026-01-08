@@ -6,3 +6,6 @@ seg+crop+pad/no-time-to-train/data.csv
 seg+crop+pad/no-time-to-train/img**
 !seg+crop+pad/no-time-to-train/
 !seg+crop+pad/no-time-to-train/.gitkeep
+mxfont/datasets_img/*_onelabel.py
+mxfont/trainer/*_onelabel.py
+mxfont/*_onelabel.py

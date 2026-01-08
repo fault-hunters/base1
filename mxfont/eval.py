@@ -12,10 +12,6 @@ import pandas as pd
 
 def build_transform(cfg):
     ts = []
-    rotation_deg = getattr(cfg.dset_aug, "rotation_deg", None)
-    rotation_p = getattr(cfg.dset_aug, "rotation_p", 0.0)
-    if rotation_deg is not None and rotation_p and rotation_p > 0:
-        ts.append(transforms.RandomApply([transforms.RandomRotation(rotation_deg, fill=0)], p=rotation_p))
     ts.extend([
         transforms.Resize((1024, 1024)), # input img resizing 512X512
         transforms.ToTensor(),
@@ -67,7 +63,7 @@ def evaluate(gen, loader, device, threshold_s, threshold_c, vis_dir: Path = None
         sim_c = torch.nn.functional.cosine_similarity(cA, cB, dim=1).clamp(-1, 1)
         sim_s = (sim_s + 1) / 2
         sim_c = (sim_c + 1) / 2
-        sim_info.append({'sim_s': sim_s, 'sim_c': sim_c})
+        sim_info.append({'sim_s': sim_s, 'sim_c': sim_c, 'label_s': label_s, 'label_c': label_c})
 
         pred_s = (sim_s >= threshold_s).float()
         pred_c = (sim_c >= threshold_c).float()

@@ -15,9 +15,14 @@ class PairTrainer:
         self.alpha_s = alpha_s
         self.alpha_c = alpha_c
 
+    def _get_gen(self):
+        # DDP wraps the real module under .module
+        return self.gen.module if hasattr(self.gen, "module") else self.gen
+
     def forward_pair(self, imgA, imgB):
-        sA, cA = self.gen.extract_style_content(imgA)
-        sB, cB = self.gen.extract_style_content(imgB)
+        gen = self._get_gen()
+        sA, cA = gen.extract_style_content(imgA)
+        sB, cB = gen.extract_style_content(imgB)
         sim_s = F.cosine_similarity(sA, sB, dim=1).clamp(-1, 1)
         sim_c = F.cosine_similarity(cA, cB, dim=1).clamp(-1, 1)
         #logit_s = -self.alpha_s * sim_s
