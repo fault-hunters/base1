@@ -17,9 +17,24 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from sconf import Config
 import torch.multiprocessing as mp
+from PIL import Image, ImageOps
 
 # setup_args_and_config: 동일 구조, work_dir 준비, n_workers 조정
 # setup_transforms: Resize -> ToTensor (+ Normalize)
+
+class SquarePad:
+    def __init__(self, fill=255):  # 흰색 배경: 255, 검정: 0, RGB면 (255,255,255)
+        self.fill = fill
+
+    def __call__(self, img: Image.Image) -> Image.Image:
+        w, h = img.size
+        size = max(w, h)
+        pad_left = (size - w) // 2
+        pad_top = (size - h) // 2
+        pad_right = size - w - pad_left
+        pad_bottom = size - h - pad_top
+        return ImageOps.expand(img, border=(pad_left, pad_top, pad_right, pad_bottom), fill=self.fill)
+
 
 def cleanup():
     dist.destroy_process_group()
@@ -81,6 +96,7 @@ def train(args, cfg, ddp_gpu):
     cfg.tb_freq = -1
 
     trn_transform = transforms.Compose([
+        SquarePad(fill=(255, 255, 255)),
         transforms.Resize((1024, 1024)), # input img resizing 512X512
         transforms.ToTensor(),
         transforms.Normalize([0.5]*3, [0.5]*3) if cfg.dset_aug.normalize else lambda x: x,
