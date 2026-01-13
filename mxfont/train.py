@@ -18,6 +18,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from sconf import Config
 import torch.multiprocessing as mp
 from PIL import Image, ImageOps
+from tqdm import tqdm
 
 # setup_args_and_config: 동일 구조, work_dir 준비, n_workers 조정
 # setup_transforms: Resize -> ToTensor (+ Normalize)
@@ -45,31 +46,53 @@ def is_main_worker(gpu):
 
 
 def train_ddp(gpu, args, cfg, world_size):
+    print(f"[rank{gpu}] enter train_ddp (pid={os.getpid()})", flush=True)
+    print(f"[rank{gpu}] before init_process_group", flush=True)
+    print(f"[rank{gpu}] after init_process_group", flush=True)
     dist.init_process_group(backend="nccl",
                             init_method="tcp://127.0.0.1:" + str(cfg.port),
                             world_size=world_size,
                             rank=gpu,)
-
-    train(args, cfg, ddp_gpu=gpu)
-    cleanup()
+    print(f"[rank{gpu}] after init_process_group", flush=True)
+    try:
+        train(args, cfg, ddp_gpu=gpu)
+    finally:
+        if dist.is_available() and dist.is_initialized():
+            dist.destroy_process_group()
+        print(f"[rank{gpu}] destroyed process group", flush=True)
+        #cleanup()
 
 def train(args, cfg, ddp_gpu):
+    print(f"[rank{ddp_gpu}] enter train", flush=True)
     if cfg.use_ddp:
         torch.cuda.set_device(ddp_gpu)
         device = torch.device(f"cuda:{ddp_gpu}")
     else:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print(f"[rank{ddp_gpu}] device={device}", flush=True)
     gen = Generator(3, cfg.C, 1, **cfg.get("g_args", {})).to(device)
+    print(f"[rank{ddp_gpu}] generator created", flush=True)
 
     if cfg.use_ddp:
         gen = DDP(gen, device_ids=[ddp_gpu], output_device=ddp_gpu)
+        print(f"[rank{ddp_gpu}] wrapped with DDP", flush=True)
 
-    # style 동결
+    # content 동결
+    '''
     g = gen.module if hasattr(gen, "module") else gen
-    for m in [g.style_enc, g.experts_s, g.fuser_style, g.fact_blocks_s]:
+    for m in [g.content_enc, g.experts_c, g.fuser_content, g.fact_blocks_c]:
         for p in m.parameters():
             p.requires_grad = False
-    
+    '''
+
+    g = gen.module if hasattr(gen, "module") else gen
+
+    print("=== Generator layers ===")
+    for name, module in g.named_modules():
+        if name == "":  # 루트 모듈은 생략
+            continue
+        print(f"{name}: {module}")
+    print("========================")
 
     optim_g = optim.Adam(gen.parameters(), lr=cfg.g_lr, betas=cfg.adam_betas)
     
@@ -94,27 +117,30 @@ def train(args, cfg, ddp_gpu):
     logger = Logger.get(file_path=cfg.work_dir / "log.log", level="info", colorize=True)
     writer = utils.DiskWriter(cfg.work_dir / "check_img", scale=0.5)
     cfg.tb_freq = -1
-
+    print(f"[rank{ddp_gpu}] build transforms", flush=True)
     trn_transform = transforms.Compose([
         SquarePad(fill=(255, 255, 255)),
         transforms.Resize((1024, 1024)), # input img resizing 512X512
         transforms.ToTensor(),
         transforms.Normalize([0.5]*3, [0.5]*3) if cfg.dset_aug.normalize else lambda x: x,
     ])
+    print(f"[rank{ddp_gpu}] before get_img_loader(train)", flush=True)
     trn_dset, trn_loader = get_img_loader(
         cfg.dset.train.data_dir, cfg.use_ddp, trn_transform,
         batch_size=cfg.batch_size,
         num_workers=cfg.n_workers,
         shuffle=True,
     )
+    print(f"[rank{ddp_gpu}] after get_img_loader(train) len={len(trn_dset)}", flush=True)
 
+    print(f"[rank{ddp_gpu}] before get_img_loader(val)", flush=True)
     val_dset, val_loader = get_img_loader(
         cfg.dset.val.data_dir, cfg.use_ddp, trn_transform,
         batch_size=cfg.batch_size,
         num_workers=cfg.n_workers,
         shuffle=False,
     )
-
+    print(f"[rank{ddp_gpu}] after get_img_loader(val) len={len(val_dset)}", flush=True)
     trainer = PairTrainer(
         gen, optim_g, cfg, logger, device=device,
         w_style=cfg.get("w_style", 0.5),
@@ -122,19 +148,32 @@ def train(args, cfg, ddp_gpu):
         threshold_s=cfg.threshold_s,
         threshold_c=cfg.threshold_c,
     )
+    print(f"[rank{ddp_gpu}] before first batch", flush=True)
+    it = iter(trn_loader)
+    batch = next(it)
+    print(f"[rank{ddp_gpu}] got first batch", flush=True)
 
     img_freq = getattr(cfg, "img_freq", 1000)
-
+    print(f"[rank{ddp_gpu}] start train", flush=True)
     for epoch in range(cfg.epoch):
         if cfg.use_ddp and hasattr(trn_loader, "sampler"):
             trn_loader.sampler.set_epoch(epoch)
+        
+        is_main = is_main_worker(ddp_gpu)
+        pbar = tqdm(
+            trn_loader,
+            total=len(trn_loader),
+            desc=f"epoch {epoch}",
+            disable=not is_main,
+            dynamic_ncols=True,
+        )
+
         train_acc_s = train_acc_c = train_loss = train_loss_s = train_loss_c = train_total = 0
-        for batch in trn_loader:
+        for batch in pbar:
             imgA, imgB, label_s, label_c = batch  # 샘플 저장용으로 언팩
             loss, loss_s, loss_c, acc, sim_s, sim_c, acc_s, acc_c, bs = trainer.train_one_batch(
                 (imgA, imgB, label_s, label_c)
             )
-
             train_acc_s += acc_s * bs
             train_acc_c += acc_c * bs
             train_loss += loss * bs
@@ -147,6 +186,10 @@ def train(args, cfg, ddp_gpu):
             mean_acc_s = train_acc_s / train_total
             mean_acc_c = train_acc_c / train_total
             mean_acc = 0.5 * (mean_acc_s + mean_acc_c)
+            pbar.set_postfix(
+                loss=f"{mean_loss:.4f}",
+                acc=f"{mean_acc*100:.2f}%",
+            )
 
             if global_step >= cfg.max_iter:
                 return
@@ -164,10 +207,18 @@ def train(args, cfg, ddp_gpu):
 
         #if (global_step % cfg.val_freq == 0) and (global_step > 0):
         if (epoch % cfg.val_freq == 0) and epoch>0  and is_main_worker(ddp_gpu):
+            print(f"[rank{ddp_gpu}] epoch{epoch} validation start", flush=True)
             gen.eval()
             total_loss = total_loss_s = total_loss_c = total_s = total_c = total = 0
             with torch.no_grad():
-                for vbatch in val_loader:
+                vbar = tqdm(
+                    val_loader,
+                    total=len(val_loader),
+                    desc=f"val {epoch}",
+                    disable=not is_main_worker(ddp_gpu),
+                    dynamic_ncols=True,
+                )
+                for vbatch in vbar:
                     loss_v, loss_s_v, loss_c_v, acc_v, acc_s_v, acc_c_v, bs = trainer.eval_one_batch(vbatch)
                     total_loss += loss_v * bs
                     total_loss_s += loss_s_v * bs
@@ -175,6 +226,14 @@ def train(args, cfg, ddp_gpu):
                     total_s += acc_s_v * bs
                     total_c += acc_c_v * bs
                     total += bs
+                    mean_loss = total_loss / total
+                    mean_acc_s = total_s / total
+                    mean_acc_c = total_c / total
+                    mean_acc = 0.5 * (mean_acc_s + mean_acc_c)
+                    vbar.set_postfix(
+                        loss=f"{mean_loss:.4f}",
+                        acc=f"{mean_acc*100:.2f}%",
+                    )
                 mean_loss = total_loss / total
                 mean_loss_s = total_loss_s / total
                 mean_loss_c = total_loss_c / total
