@@ -1,0 +1,16 @@
+use_ddp: True   # whether to use DataDistributedParallel, for multi-gpus.
+port: 29501  # the port for the DataDistributedParallel training.
+
+# style이랑 content 같은 가중치 쓸 때
+resume: 
+# 가중치style이랑 content따로 둘때
+split: True # 따로 돌릴때 True 아니면 False
+resume_s: /home/ubuntu/Dataset/Augmentation_Output/result_new_label_c2s9/lr1-e5/gen_8.pth
+resume_c: /home/ubuntu/Dataset/Augmentation_Output/result_new_label_c2s9/lr1-e5/gen_5.pth
+
+dset:   # leave blank
+  train:   # leave blank
+    data_dir: /home/ubuntu/Dataset/Augmentation_Output/train_pairs_ratio_same.csv   # path to .ttf files for the training
+  val:   # leave blank
+    data_dir: /home/ubuntu/Dataset/Augmentation_Output/val_pairs_ratio_same.csv   # path to .ttf files for the validation
+    

@@ -1,0 +1,8 @@
+dset:
+  test:
+    # 사용할 데이터 csv
+    data_dir: /home/ubuntu/Dataset/dataset_no_removed_version/segmentation_result_metadata_filtered_check(t0v1).csv
+    # 유사도 맵 저장할 위치(폴더)
+    work_dir: ./com_map/com_map_temp5
+    # 평가할 가중치
+    weight: 

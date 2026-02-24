@@ -1,3 +1,0 @@
-dset:
-  test:
-    data_dir: data/test.csv   # path to reference images

@@ -1,11 +1,4 @@
-mxfont/data/**
-!mxfont/data/
-!mxfont/data/.gitkeep
+mxfont
+seg+crop+pad
 new_api/config.yaml
-seg+crop+pad/no-time-to-train/data.csv
-seg+crop+pad/no-time-to-train/img**
-!seg+crop+pad/no-time-to-train/
-!seg+crop+pad/no-time-to-train/.gitkeep
-mxfont/datasets_img/*_onelabel.py
-mxfont/trainer/*_onelabel.py
-mxfont/*_onelabel.py
+total_process/checkpoints
