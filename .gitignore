@@ -1,5 +1,4 @@
 mxfont
 seg+crop+pad
-new_api/config.yaml
 total_process/checkpoints
 **/__pycache__/

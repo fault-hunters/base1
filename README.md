@@ -23,12 +23,12 @@
     - 전체
     <br><img src="total_process/mxfont_process/model_structure_img/model_flow.png" width="1500">
     - feature extraction 블록
-    <br><img src="total_process/mxfont_process/model_structure_img/feature_extraction.png" width="400">
+    <br><img src="total_process/mxfont_process/model_structure_img/feature_extraction.png" width="200">
         - 자세한건 mxfont.git참고
     - feature_map 정리 블록
     <br><img src="total_process/mxfont_process/model_structure_img/feature_map_정리.png" width="1000">
     - vectorization 블록
-    <br><img src="total_process/mxfont_process/model_structure_img/vectorization.png" width="700">
+    <br><img src="total_process/mxfont_process/model_structure_img/vectorization.png" width="500">
 
 - train
     ```

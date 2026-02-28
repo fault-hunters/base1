@@ -1,0 +1,11 @@
+gpt:
+  key: "my gpt key"
+  model: "gpt-5.1"
+gemini:
+  key: "my gemini key"
+  model: "gemini-3-pro-image-preview"
+  aspect_ratio: "1:1"
+  image_size: "2K"
+output:
+  prompt_guide: "prompting_guilde.txt"
+  output_dir: "outputs"
