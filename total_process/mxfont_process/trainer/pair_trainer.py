@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 
 class PairTrainer:
-    def __init__(self, gen, optim, cfg, logger, device="cuda", w_style=1.0, w_content=1.0, threshold_s = 0.8, threshold_c = 0.8, alpha_s = 10.0, alpha_c = 10.0):
+    def __init__(self, gen, optim, cfg, logger, device="cuda", w_style=1.0, w_content=1.0, threshold_s = 0.8, threshold_c = 0.8):
         self.gen = gen.to(device).train()
         self.optim = optim
         self.logger = logger
@@ -12,8 +12,6 @@ class PairTrainer:
         self.w_content = w_content
         self.threshold_s = threshold_s
         self.threshold_c = threshold_c
-        self.alpha_s = alpha_s
-        self.alpha_c = alpha_c
 
     def _get_gen(self):
         # DDP wraps the real module under .module

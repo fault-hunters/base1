@@ -19,6 +19,17 @@
 - 가져온 network
     - https://github.com/clovaai/mxfont.git
     - Encoder 부분
+- model flow
+    - 전체
+    <br><img src="total_process/mxfont_process/model_structure_img/model_flow.png" width="1500">
+    - feature extraction 블록
+    <br><img src="total_process/mxfont_process/model_structure_img/feature_extraction.png" width="400">
+        - 자세한건 mxfont.git참고
+    - feature_map 정리 블록
+    <br><img src="total_process/mxfont_process/model_structure_img/feature_map_정리.png" width="1000">
+    - vectorization 블록
+    <br><img src="total_process/mxfont_process/model_structure_img/vectorization.png" width="700">
+
 - train
     ```
     python train.py cfgs/train.yaml
@@ -47,6 +58,8 @@
             - 기본값 0
             - 0이면 저장안함
         - 나머지는 cfgs 아래 eva.yaml에서 설정
+    - 주의사항
+        - 시작하기 전에 "com_map" 폴더 직접 만들고나서 시작
 
 ### seg_crop_process
 - MXDetector로 들어가기전 segmentation하는 모델

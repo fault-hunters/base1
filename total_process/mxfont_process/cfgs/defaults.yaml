@@ -22,9 +22,6 @@ init: kaiming
 
 dset_aug:
   normalize: True
-  random_affine: False
-  rotation_deg: [-180, 180]  # 원하는 각도 범위 (스칼라 값도 가능)
-  rotation_p: 0.5  # 0이면 비활성
 
 dset:
   train:
@@ -55,46 +52,18 @@ g_args:
     activ: relu
     pad_type: zero
     out: sigmoid
-d_args:
-  w_norm: spectral
-  activ: relu
-  gap_activ: relu
-  pad_type: zero
-  res_scale_var: False
-ac_args:
-  norm: in
-  activ: relu
-  pad_type: zero
-  conv_dropout: 0.3
-  clf_dropout: 0.2
-
-# losses
-pixel_loss_type: l1
-pixel_w: 0.1
-gan_w: 1.0
-fm_layers: all
-fm_w: 1.0
-ac_w: 1.0
-ac_gen_w: 1.0
-ac_cross_w: 1.0
-indp_exp_w: 1.0
-indp_fact_w: 1.0
 
 # etc
-save: all-last
-val_freq: 1
-save_freq: 1
-tb_freq: 1
-img_freq: 1
+val_freq: 1 # val 결과 기록 빈도
+save_freq: 1 # weight 저장 빈도
+img_freq: 1 # train 결과 기록 빈도
 
 # threshold
 threshold_s: 0.7
 threshold_c: 0.9
 #epoch
 epoch: 500
-#alpha
-alpha_s: 10.0
-alpha_c: 10.0
-#weight
+
+#loss 계산시 style과 content반영 가중치
 w_style: 1.0
 w_content: 1.0

@@ -118,7 +118,6 @@ def train(args, cfg, ddp_gpu):
     
     logger = Logger.get(file_path=cfg.work_dir / "log.log", level="info", colorize=True)
     writer = utils.DiskWriter(cfg.work_dir / "check_img", scale=0.5)
-    cfg.tb_freq = -1
     print(f"[rank{ddp_gpu}] build transforms", flush=True)
     trn_transform = transforms.Compose([
         SquarePad(fill=(255, 255, 255)),
@@ -223,7 +222,7 @@ def train(args, cfg, ddp_gpu):
                 f"| acc_s {mean_acc_s*100:.2f}% | acc_c {mean_acc_c*100:.2f}% "
             )
 
-        if (epoch % cfg.val_freq == 0):
+        if epoch % cfg.val_freq == 0:
             print(f"[rank{ddp_gpu}] epoch{epoch} validation start", flush=True)
             sim_info = []
             gen.eval()
